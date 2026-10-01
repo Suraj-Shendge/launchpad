@@ -21,6 +21,7 @@ async function resolveAdminAccess(){
  return {supabase,user,access:{role:data.role as AdminRole,permissions:(Array.isArray(data.permissions)?data.permissions:[]).filter(isAdminPermission),expiresAt:data.expires_at??null,isSuperAdmin:false}};
 }
 
+export async function getOptionalAdminAccess(){const result=await resolveAdminAccess();return result.access;}
 export async function getAdminAccess(){const result=await resolveAdminAccess();if(!result.user||!result.access)redirect("/");return result as {supabase:NonNullable<typeof result.supabase>;user:NonNullable<typeof result.user>;access:AdminAccess};}
 export async function requireAdmin(permission?:AdminPermission){const result=await resolveAdminAccess();if(!result.user||!result.access)redirect("/");if(permission&&!result.access.permissions.includes(permission))redirect("/");return result.supabase!;}
 export async function requireAdminApi(permission?:AdminPermission){const result=await resolveAdminAccess();if(!result.user||!result.access)return {error:NextResponse.json({error:"Administrator access required."},{status:403})};if(permission&&!result.access.permissions.includes(permission))return {error:NextResponse.json({error:"You do not have permission for this action."},{status:403})};return {supabase:result.supabase!,user:result.user,access:result.access};}
