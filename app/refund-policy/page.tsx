@@ -1,0 +1,3 @@
+import { Navbar } from "@/components/projecthub/navbar";
+import { Footer } from "@/components/projecthub/footer";
+export default function RefundPolicy(){return <div><Navbar/><main className="legal-page section"><p className="eyebrow">Legal</p><h1 className="section-title">Refund policy.</h1><div className="legal-copy"><p>This draft should be replaced by the operator-approved refund rules for featured promotions and auction-related payments.</p><h2>Promotion refunds</h2><p>[Define eligible cancellation, failed activation and refund windows.]</p><h2>Auction payments</h2><p>[Define winner payment deadlines, failed-payment handling and any re-auction rules.]</p><h2>Support</h2><p>[Support email and operator details to be supplied.]</p></div></main><Footer/></div>}

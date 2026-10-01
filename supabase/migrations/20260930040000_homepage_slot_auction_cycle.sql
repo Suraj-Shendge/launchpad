@@ -1,0 +1,2 @@
+-- Superseded for the Launchpad 2.0 -> ProjectHub transformation.
+-- Homepage auction lifecycle is implemented in the applied ProjectHub transformation migration and application endpoints.

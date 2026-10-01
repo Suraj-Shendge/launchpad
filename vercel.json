@@ -1,0 +1,7 @@
+{
+  "crons":[
+    {"path":"/api/cron/settle-auctions","schedule":"*/5 * * * *"},
+    {"path":"/api/homepage-auction-cycle","schedule":"*/5 * * * *"},
+    {"path":"/api/cron/newsletter-sync","schedule":"*/5 * * * *"}
+  ]
+}

@@ -1,0 +1,1 @@
+export default function Loading(){return <main className="section loading-page"><div className="loading-bar"/><div className="loading-bar loading-wide"/><div className="loading-grid">{Array.from({length:6},(_,i)=><div className="skeleton-card" key={i}/>)}</div></main>}
