@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/projecthub/navbar";
@@ -9,6 +10,12 @@ import { createClient } from "@/lib/supabase/server";
 
 type Params = Promise<{ forumSlug: string }>;
 type SearchParams = Promise<{ q?: string; sort?: string }>;
+
+export async function generateMetadata({params}:{params:Params}):Promise<Metadata>{
+ const {forumSlug}=await params; const forums=await getCommunityForums(); const forum=forums.find(item=>item.slug===forumSlug);
+ if(!forum)return {title:"Forum not found",robots:{index:false,follow:false}};
+ return {title:forum.name,description:forum.description,alternates:{canonical:"/community/f/"+forum.slug},openGraph:{title:forum.name+" — ProjectHub",description:forum.description,type:"website"}};
+}
 
 export default async function CommunityForumPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { forumSlug } = await params;

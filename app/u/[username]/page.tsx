@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Github, Linkedin, Globe, Twitter } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -12,10 +13,19 @@ import { getProfileTier } from "@/lib/profile";
 
 type Params=Promise<{username:string}>;
 
+export async function generateMetadata({params}:{params:Params}):Promise<Metadata>{
+ const {username}=await params; const supabase=await createClient();
+ const {data:profile}=await supabase.from("profiles").select("display_name,username,name,bio,avatar_url,is_blocked").eq("username",username).maybeSingle();
+ if(!profile||profile.is_blocked)return {title:"Profile not found",robots:{index:false,follow:false}};
+ const name=profile.display_name||profile.username||profile.name||"ProjectHub member";
+ const description=profile.bio||("Discover "+name+" and their published projects on ProjectHub.");
+ return {title:name,description,alternates:{canonical:"/u/"+profile.username},openGraph:{title:name+" — ProjectHub",description,type:"profile"}};
+}
+
 export default async function PublicProfile({params}:{params:Params}){
  const {username}=await params; const supabase=await createClient();
- const {data:profile}=await supabase.from("profiles").select("id,display_name,username,name,bio,avatar_url,website_url,twitter_url,linkedin_url,github_url,created_at,verification_tier,github_connected").eq("username",username).maybeSingle();
- if(!profile)notFound();
+ const {data:profile}=await supabase.from("profiles").select("id,display_name,username,name,bio,avatar_url,website_url,twitter_url,linkedin_url,github_url,created_at,verification_tier,github_connected,is_blocked").eq("username",username).maybeSingle();
+ if(!profile||profile.is_blocked)notFound();
  const {data:{user}}=await supabase.auth.getUser();
  const [projects,{count:publishedCount},followers,{data:isFollowing}]=await Promise.all([
    getPublishedProjects({creatorId:profile.id,limit:24}),

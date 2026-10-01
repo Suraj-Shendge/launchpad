@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/projecthub/navbar";
 import { Footer } from "@/components/projecthub/footer";
@@ -5,6 +6,13 @@ import { CommunitySearch, CommunitySidebar, CommunitySortTabs, CommunityThreadLi
 import { getCommunityForums, getCommunityThreads, getCommunityViewer } from "@/lib/community";
 
 type Params = Promise<{ q?: string; sort?: string }>;
+
+export const metadata: Metadata = {
+  title: "Community",
+  description: "Ask questions, share what you are building, get feedback, and learn from other makers on ProjectHub.",
+  alternates: { canonical: "/community" },
+  openGraph: { title: "Community — ProjectHub", description: "Discussions, feedback and ideas from ProjectHub makers.", type: "website" },
+};
 
 export default async function Community({ searchParams }: { searchParams: Params }) {
   const params = await searchParams;

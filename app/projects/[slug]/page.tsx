@@ -18,7 +18,11 @@ import { getProjectBySlug, getPublishedProjects } from "@/lib/data";
 
 export async function generateMetadata({params}:{params:Promise<{slug:string}>}):Promise<Metadata>{
  const {slug}=await params;const project=await getProjectBySlug(slug);
- return project?{title:project.name,description:project.tagline}:{title:"Project not found"};
+ if(!project)return {title:"Project not found",robots:{index:false,follow:false}};
+ const base=process.env.NEXT_PUBLIC_SITE_URL??"http://localhost:3000";
+ const url=base+"/projects/"+project.slug;
+ const image=project.preview_images?.[0]||project.logo_url||base+"/opengraph-image.png";
+ return {title:project.name,description:project.tagline,alternates:{canonical:"/projects/"+project.slug},openGraph:{title:project.name+" — ProjectHub",description:project.tagline,url,type:"website",images:[{url:image}]},twitter:{card:"summary_large_image",title:project.name+" — ProjectHub",description:project.tagline,images:[image]}};
 }
 
 export default async function ProjectPage({params}:{params:Promise<{slug:string}>}){
@@ -46,7 +50,8 @@ export default async function ProjectPage({params}:{params:Promise<{slug:string}
   supabase.rpc("get_follow_count",{p_following_type:"user",p_following_id:project.creator_id}),
   viewer&&viewer.id!==project.creator_id?supabase.rpc("is_following",{p_following_type:"user",p_following_id:project.creator_id}):Promise.resolve({data:false})
  ]):[{data:0},{data:false}];
- return <div><Navbar/><main><ViewTracker projectId={project.id}/>
+ const structuredData=JSON.stringify({"@context":"https://schema.org","@type":"SoftwareApplication",name:project.name,description:project.tagline,url:publicUrl,image:project.preview_images?.[0]||project.logo_url||undefined,applicationCategory:project.category?.name||"Software",author:creatorName?{"@type":"Person",name:creatorName}:undefined}).replace(/</g,"\\u003c");
+ return <div><Navbar/><main><ViewTracker projectId={project.id}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:structuredData}}/>
   <section className="project-hero section"><div className="project-detail-intro"><div className="project-detail-mark">{project.logo_url?<img src={project.logo_url} alt="" className="detail-logo"/>:<span>{project.name.slice(0,1)}</span>}</div>
    <p className="eyebrow">{project.category?.name??"Project"}</p><h1>{project.name}</h1><p className="detail-tagline">{project.tagline}</p>
    <div className="detail-actions"><a className="button-primary" href={"/projects/"+project.slug+"/visit"}>Visit Project <ArrowUpRight size={16}/></a><ProjectUpvoteButton projectId={project.id} initialCount={project.upvote_count??0} initialUpvoted={project.viewer_upvoted}/><ShareButton url={publicUrl}/></div>

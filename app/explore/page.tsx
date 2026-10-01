@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Navbar } from "@/components/projecthub/navbar";
@@ -8,6 +9,11 @@ import { getCategories, getPublishedProjects } from "@/lib/data";
 type Params = Promise<{q?:string;category?:string}>;
 
 export const instant = false;
+
+export async function generateMetadata({searchParams}:{searchParams:Params}):Promise<Metadata>{
+  const params=await searchParams; const q=params.q?.trim()||""; const category=params.category||"";
+  return {title:q?"Search: "+q:category?"Explore "+category:"Explore projects",description:"Discover published products, tools and ideas from ProjectHub makers.",alternates:{canonical:"/explore"},robots:{index:!q&&!category,follow:true},openGraph:{title:"Explore projects — ProjectHub",description:"Discover published products, tools and ideas from ProjectHub makers.",type:"website"}};
+}
 
 export default async function Explore({searchParams}:{searchParams:Params}) {
   const params=await searchParams;

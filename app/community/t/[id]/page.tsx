@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/projecthub/navbar";
@@ -12,6 +13,16 @@ import { getCommunityThread, getCommunityViewer } from "@/lib/community";
 type Params=Promise<{id:string}>;
 function authorName(author:{display_name:string|null;username:string|null;name:string|null}|null|undefined){return author?.display_name||author?.username||author?.name||"ProjectHub member"}
 function formatDate(value:string){return new Intl.DateTimeFormat("en",{month:"short",day:"numeric",year:"numeric"}).format(new Date(value))}
+
+export async function generateMetadata({params}:{params:Params}):Promise<Metadata>{
+ const {id}=await params; const supabase=await createClient();
+ const {data:thread}=await supabase.from("community_threads").select("id,title,content,forum_id").eq("id",id).maybeSingle();
+ if(!thread)return {title:"Discussion not found",robots:{index:false,follow:false}};
+ const {data:forum}=await supabase.from("community_forums").select("name").eq("id",thread.forum_id).maybeSingle();
+ const description=thread.content.replace(/\s+/g," ").trim().slice(0,155)||"Join the discussion on ProjectHub.";
+ const forumSuffix=forum?.name?" · "+forum.name:"";
+ return {title:thread.title+forumSuffix,description,alternates:{canonical:"/community/t/"+thread.id},openGraph:{title:thread.title+" — ProjectHub",description,type:"article"}};
+}
 
 export default async function CommunityThreadPage({params}:{params:Params}){
  const {id}=await params;const [data,viewer]=await Promise.all([getCommunityThread(id),getCommunityViewer()]);if(!data)notFound();

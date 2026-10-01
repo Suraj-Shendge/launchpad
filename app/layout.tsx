@@ -10,7 +10,9 @@ export const metadata: Metadata = {
   metadataBase:new URL(baseUrl),
   title:{default:"ProjectHub — Launch. Discover. Promote.", template:"%s — ProjectHub"},
   description:"A premium product discovery, launch and promotion platform for founders, developers, creators and makers.",
-  openGraph:{title:"ProjectHub — Launch. Discover. Promote.",description:"Launch, discover and promote the next generation of projects.",type:"website"},
+  alternates:{canonical:"/"},
+  openGraph:{title:"ProjectHub — Launch. Discover. Promote.",description:"Launch, discover and promote the next generation of projects.",type:"website",url:baseUrl,images:["/opengraph-image.png"]},
+  twitter:{card:"summary_large_image",title:"ProjectHub — Launch. Discover. Promote.",description:"Launch, discover and promote the next generation of projects.",images:["/twitter-image.png"]},
   robots:{index:true,follow:true},
 };
 

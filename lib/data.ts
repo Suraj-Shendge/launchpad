@@ -30,9 +30,25 @@ export async function getPublishedProjects(opts?:{search?:string;category?:strin
   const supabase=await client(); if(!supabase) return [];
   let q=supabase.from("project_directory").select("*").eq("status","published");
   const search=opts?.search?.replace(/[^a-zA-Z0-9_+@#\- ]/g," ").trim().slice(0,80) || "";
-  if(search) q=q.or("name.ilike.%"+search+"%,tagline.ilike.%"+search+"%,description.ilike.%"+search+"%");
   if(opts?.category) q=q.eq("category_slug",opts.category);
   if(opts?.creatorId) q=q.eq("creator_id",opts.creatorId);
+  if(search){
+    const {data:matchingTags}=await supabase.from("tags").select("id").ilike("name","%"+search+"%");
+    const tagIds=(matchingTags??[]).map(tag=>tag.id);
+    let tagProjectIds:string[]=[];
+    if(tagIds.length){
+      const {data:tagRows}=await supabase.from("project_tags").select("project_id").in("tag_id",tagIds);
+      tagProjectIds=[...new Set((tagRows??[]).map(row=>row.project_id))];
+    }
+    const clauses=[
+      "name.ilike.%"+search+"%",
+      "tagline.ilike.%"+search+"%",
+      "description.ilike.%"+search+"%",
+      "category_name.ilike.%"+search+"%",
+    ];
+    if(tagProjectIds.length)clauses.push("id.in.("+tagProjectIds.join(",")+")");
+    q=q.or(clauses.join(","));
+  }
   const {data}=await q.order("published_at",{ascending:false}).limit(opts?.limit??24);
   return attachProjectEngagement(supabase,(data??[]).map(r=>mapProject(r as ProjectRow)));
 }
