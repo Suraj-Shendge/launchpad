@@ -23,6 +23,44 @@ export async function GET(request:Request){
   if(error)return NextResponse.json({error:error.message},{status:500});
 
   let settled=0,extended=0,orders=0;
+
+  const endingSoonUntil=new Date(now.getTime()+5*60*1000).toISOString();
+  const {data:endingSoonAuctions}=await admin.from("auctions")
+    .select("id,ends_at,homepage_slot")
+    .eq("status","active")
+    .gt("ends_at",now.toISOString())
+    .lte("ends_at",endingSoonUntil)
+    .limit(50);
+  for(const auction of endingSoonAuctions??[]){
+    const {data:topBid}=await admin.from("auction_bids")
+      .select("bidder_id,project_id,amount")
+      .eq("auction_id",auction.id)
+      .order("amount",{ascending:false})
+      .order("created_at",{ascending:true})
+      .limit(1)
+      .maybeSingle();
+    if(!topBid)continue;
+    const {data:project}=await admin.from("projects").select("name").eq("id",topBid.project_id).maybeSingle();
+    const {data:existingEndingNotice}=await admin.from("notifications").select("id")
+      .eq("user_id",topBid.bidder_id)
+      .eq("type","auction_ending_soon")
+      .eq("reference_type","auction")
+      .eq("reference_id",auction.id)
+      .maybeSingle();
+    if(!existingEndingNotice){
+      await admin.from("notifications").insert({
+        user_id:topBid.bidder_id,
+        type:"auction_ending_soon",
+        title:"Auction ending soon",
+        message:"Your current bid of ₹"+Number(topBid.amount).toLocaleString("en-IN")+
+          (project?.name?" on "+project.name:" on this auction")+" is currently winning. The auction ends within 5 minutes.",
+        link:"/auctions/"+auction.id,
+        reference_type:"auction",
+        reference_id:auction.id
+      });
+    }
+  }
+
   for(const auction of active??[]){
     const {data:result,error:settleError}=await admin.rpc("settle_auction",{p_auction_id:auction.id});
     if(settleError)continue;

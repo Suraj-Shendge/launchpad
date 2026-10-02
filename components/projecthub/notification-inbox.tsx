@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, CheckCheck, MessageCircle, Rocket, ThumbsUp, UserPlus } from "lucide-react";
+import { Bell, CheckCheck, Gavel, MessageCircle, Rocket, ThumbsUp, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -18,6 +18,7 @@ function Icon({type}:{type:string}){
  if(type==="new_follower")return <UserPlus size={15}/>;
  if(type==="project_upvote")return <ThumbsUp size={15}/>;
  if(type==="followed_user_project")return <Rocket size={15}/>;
+ if(type.startsWith("auction_"))return <Gavel size={15}/>;
  if(type.startsWith("community_"))return <MessageCircle size={15}/>;
  return <Bell size={15}/>;
 }
