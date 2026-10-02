@@ -3,6 +3,12 @@ import { requireAdmin, getAdminAccess } from "@/lib/auth";
 import { getNewsletterEdition } from "@/lib/newsletter/admin-service";
 import { NewsletterEditor } from "@/components/projecthub/newsletter-editor";
 import { analyticsNewsletterEdition } from "@/lib/newsletter/admin-service";
+import type { Metadata } from "next";
+
+export async function generateMetadata(): Promise<Metadata> {
+ const title = "Newsletter | ProjectHub Admin";
+ return { title };
+}
 
 export default async function EditNewsletter({params}:{params:Promise<{id:string}>}){
  const auth=await requireAdmin("newsletter.view"); const {access}=await getAdminAccess(); const id=(await params).id;
