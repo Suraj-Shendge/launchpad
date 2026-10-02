@@ -155,9 +155,9 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
     <form className="launch-form" onSubmit={launchProject}>
       <div className="launch-form-grid">
         <section className="launch-main">
-          <div className="launch-step"><span>01</span><div><p className="eyebrow">Project URL</p><h2>Start with your website.</h2><p>We use your URL to detect the title, description and logo so you can get to launch faster.</p></div></div>
+          <div className="launch-step"><span>01</span><div><p className="eyebrow">Project links</p><h2>Start with your GitHub repository.</h2><p>A website is optional. GitHub is used for ownership verification; a website can be added when you have one.</p></div></div>
           <div className="launch-url-row">
-            <div className="input-with-icon"><Link2 size={17}/><input value={form.website_url} onChange={e=>update("website_url",e.target.value)} placeholder="https://yourproject.com" type="url" required/></div>
+            <div className="input-with-icon"><Link2 size={17}/><input value={form.website_url} onChange={e=>update("website_url",e.target.value)} placeholder="https://yourproject.com" type="url"/></div>
             <button type="button" className="button-soft" onClick={fetchMetadata} disabled={!canFetch||metadataBusy}>{metadataBusy?<><Loader2 size={15} className="spin"/>Fetching…</>:<><Sparkles size={15}/>Fetch details</>}</button>
           </div>
           {notice&&<p className="form-success"><Check size={14}/>{notice}</p>}
@@ -165,15 +165,15 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
 
         <aside className="launch-side">
           <p className="eyebrow">Launch checklist</p>
-          <div className="check-row"><span>URL</span><strong>{form.website_url?"Ready":"Add URL"}</strong></div>
+          <div className="check-row"><span>Website</span><strong>{form.website_url?"Ready":"Optional"}</strong></div>
           <div className="check-row"><span>Details</span><strong>{form.name&&form.tagline?"Ready":"Pending"}</strong></div>
           <div className="check-row"><span>Category</span><strong>{form.category_id?"Ready":"Pending"}</strong></div>
-          <div className="check-row"><span>GitHub verification</span><strong>{form.github_url?"Required after submit":"Required"}</strong></div>
+          <div className="check-row"><span>GitHub</span><strong>{form.github_url?"Ready":"Required"}</strong></div>
         </aside>
       </div>
       <section className="launch-details">
         <div className="launch-step"><span>02</span><div><p className="eyebrow">Project details</p><h2>Make the launch page yours.</h2><p>Metadata is a starting point. Everything remains editable before you submit.</p></div></div>
-        <div className="launch-requirement-note"><div><strong>GitHub verification is mandatory.</strong><span>Every ProjectHub launch must include a GitHub repository you control. You can submit before verification, but publication requires successful GitHub verification.</span></div></div>
+        <div className="launch-requirement-note"><div><strong>GitHub ownership is the required project check.</strong><span>A website is optional. After submission, ProjectHub can verify control of your GitHub repository; moderators can then approve the project for publication without requiring website ownership.</span></div></div>
         <div className="form-grid">
           <label>Project name<input value={form.name} onChange={e=>update("name",e.target.value)} maxLength={80} placeholder="Your project" required/></label>
           <label>Category<select value={form.category_id} onChange={e=>update("category_id",e.target.value)} required><option value="">Choose a category</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
@@ -182,7 +182,7 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
         <label>Description<textarea value={form.description} onChange={e=>update("description",e.target.value)} rows={7} maxLength={4000} placeholder="Explain the product, who it is for, and why it exists." required/></label>
         <div className="form-grid">
           <label>Tags<input value={form.tags} onChange={e=>update("tags",e.target.value)} placeholder="ai, saas, productivity"/></label>
-          <label className="required-field"><span className="field-label-row"><span>GitHub repository</span><span className="field-required">Required</span></span><input value={form.github_url} onChange={e=>update("github_url",e.target.value)} placeholder="https://github.com/you/project" type="url" required/><small><strong>GitHub verification is mandatory.</strong> After you submit, ProjectHub gives you a unique token. Add it to the repository to verify control. Your project can enter moderation before verification, but it cannot be published until GitHub verification succeeds. Forks are detected separately.</small></label>
+          <label className="required-field"><span className="field-label-row"><span>GitHub repository</span><span className="field-required">Required</span></span><input value={form.github_url} onChange={e=>update("github_url",e.target.value)} placeholder="https://github.com/you/project" type="url" required/><small><strong>GitHub is the required ownership check.</strong> After you submit, ProjectHub gives you a unique token. Add it to the repository to verify control. Website ownership is optional and is never required for publication.</small></label>
         </div>
         <label>Social links<input value={form.social_links} onChange={e=>update("social_links",e.target.value)} placeholder="x=https://x.com/…, linkedin=https://…"/></label>
       </section>
@@ -210,7 +210,7 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
         <div>
           <p className="eyebrow">04 · Ready to launch</p>
           <h2>Submit for moderation.</h2>
-          <p>Your project enters moderation after submission. GitHub verification is mandatory before an approved project can be published across ProjectHub.</p>
+          <p>Your project enters moderation after submission. An approved project can be published using GitHub ownership verification; website ownership is optional.</p>
         </div>
         {error&&<p className="form-error" role="alert">{error}</p>}
         <div className="launch-actions">

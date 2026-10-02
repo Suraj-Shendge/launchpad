@@ -93,8 +93,8 @@ export async function getProjectBySlug(slug:string):Promise<Project|null> {
   const {data}=await supabase.from("project_directory").select("*").eq("slug",slug).maybeSingle();
   if(!data) return null;
   const project=mapProject(data as ProjectRow);
-  const {data:assets}=await supabase.from("projects").select("preview_images").eq("id",project.id).maybeSingle();
-  const enriched={...project,preview_images:Array.isArray(assets?.preview_images)?assets.preview_images:[]};
+  const {data:assets}=await supabase.from("projects").select("preview_images,github_url").eq("id",project.id).maybeSingle();
+  const enriched={...project,github_url:assets?.github_url??null,preview_images:Array.isArray(assets?.preview_images)?assets.preview_images:[]};
   return (await attachProjectEngagement(supabase,[enriched]))[0]??enriched;
 }
 

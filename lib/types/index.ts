@@ -12,7 +12,7 @@ export type ProjectRow = {
   tags:string[]; featured:boolean; promoted:boolean; upvote_count:number;
 };
 
-export type Project = Omit<ProjectRow,"category_id"|"category_name"|"category_slug"> & { category:Category|null; viewer_upvoted?:boolean };
+export type Project = Omit<ProjectRow,"category_id"|"category_name"|"category_slug"> & { category:Category|null; github_url?:string|null; viewer_upvoted?:boolean };
 export type Auction = {
   id:string; project_id:string|null; placement:string; starting_price:number;
   current_bid:number|null; current_bid_project_id:string|null; winning_project_id:string|null; homepage_slot:number|null;

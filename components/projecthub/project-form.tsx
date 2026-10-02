@@ -17,7 +17,7 @@ export function ProjectForm({categories}:{categories:Category[]}) {
     router.push("/dashboard/projects?submitted=1"); router.refresh();
   }
   return <form onSubmit={submit} className="project-form">
-    <div className="form-grid"><label>Project name<input name="name" maxLength={80} required placeholder="Your project"/></label><label>Website URL<input name="website_url" type="url" required placeholder="https://"/></label></div>
+    <div className="form-grid"><label>Project name<input name="name" maxLength={80} required placeholder="Your project"/></label><label>Website URL <span className="field-optional">Optional</span><input name="website_url" type="url" placeholder="https://"/></label></div>
     <label>Tagline<input name="tagline" maxLength={120} required placeholder="One clear sentence about what it does"/></label>
     <label>Description<textarea name="description" rows={7} maxLength={4000} required placeholder="Explain the product, who it is for, and what makes it useful."/></label>
     <div className="form-grid"><label>Category<select name="category_id" required><option value="">Choose a category</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label>Tags<input name="tags" placeholder="ai, saas, productivity"/></label></div>

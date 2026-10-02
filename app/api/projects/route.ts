@@ -8,7 +8,7 @@ const schema=z.object({
   name:z.string().trim().min(2).max(80),
   tagline:z.string().trim().min(5).max(120),
   description:z.string().trim().min(20).max(4000),
-  website_url:z.string().url().max(500),
+  website_url:z.string().trim().url().max(500).optional().or(z.literal("")),
   category_id:z.string().uuid(),
   tags:z.string().max(500).optional(),
   social_links:z.string().max(1000).optional(),
@@ -80,12 +80,12 @@ export async function POST(request:Request){
 
   const {data:project,error}=await supabase.from("projects").insert({
     user_id:user.id,owner_id:user.id,name:value.name,slug,tagline:value.tagline,description:value.description,
-    website_url:value.website_url,github_url:value.github_url||null,category:category.name,category_id:value.category_id,logo_url,social_links,preview_images,status:"pending_review",
+    website_url:value.website_url||null,github_url:value.github_url||null,category:category.name,category_id:value.category_id,logo_url,social_links,preview_images,status:"pending_review",
   }).select("id,slug").single();
   if(error) return NextResponse.json({error:error.code==="23505"?"That project URL is already taken.":"Could not create project."},{status:400});
 
   const verificationToken="phv_"+crypto.randomUUID().replace(/-/g,"");
-  const verification=await supabase.from("project_verifications").insert({project_id:project.id,github_url:value.github_url||null,website_url:value.website_url,verification_token:verificationToken});
+  const verification=await supabase.from("project_verifications").insert({project_id:project.id,github_url:value.github_url||null,website_url:value.website_url||null,verification_token:verificationToken});
   if(verification.error) console.error("Project verification initialization failed",verification.error);
 
   const tagNames=(value.tags||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean).slice(0,8);
