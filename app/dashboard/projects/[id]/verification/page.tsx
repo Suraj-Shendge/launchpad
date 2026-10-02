@@ -18,12 +18,12 @@ export default async function ProjectVerificationPage({params}:{params:Promise<{
   let {data:verification}=await db.from("project_verifications").select("*").eq("project_id",id).maybeSingle();
   if(!verification){
     const token="phv_"+crypto.randomUUID().replace(/-/g,"");
-    verification=(await db.from("project_verifications").insert({project_id:id,github_url:project.github_url,website_url:project.website_url,website_status:project.website_url?"pending":"not_required",cross_link_status:project.website_url?"pending":"not_required",verification_token:token}).select("*").single()).data;
+    verification=(await db.from("project_verifications").insert({project_id:id,github_url:project.github_url,website_url:project.website_url,github_status:project.github_url?"pending":"not_required",website_status:project.website_url?"pending":"not_required",cross_link_status:project.github_url&&project.website_url?"pending":"not_required",verification_token:token}).select("*").single()).data;
   }
   if(!verification) redirect("/dashboard/projects");
   return <div><Navbar authenticated/><main className="dashboard-shell shell verification-page">
     <Link href="/dashboard/projects" className="back-link"><ArrowLeft size={14}/>Back to projects</Link>
-    <div className="dashboard-head"><div><p className="eyebrow">Ownership verification</p><h1>{project.name}.</h1><p>Verify GitHub repository control. Website ownership is optional and is only checked when a website is supplied.</p></div></div>
+    <div className="dashboard-head"><div><p className="eyebrow">Ownership verification</p><h1>{project.name}.</h1><p>ProjectHub checks the GitHub repository or website supplied for this project. When both are present, both checks are available.</p></div></div>
     <ProjectVerificationPanel projectId={id} initial={verification}/>
   </main><Footer/></div>;
 }

@@ -19,7 +19,7 @@ export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){
   let {data:verification}=await db.from("project_verifications").select("*").eq("project_id",project.id).maybeSingle();
   if(!verification){
     const token="phv_"+crypto.randomUUID().replace(/-/g,"");
-    verification=(await db.from("project_verifications").insert({project_id:project.id,github_url:project.github_url,website_url:project.website_url,verification_token:token}).select("*").single()).data;
+    verification=(await db.from("project_verifications").insert({project_id:project.id,github_url:project.github_url,website_url:project.website_url,github_status:project.github_url?"pending":"not_required",website_status:project.website_url?"pending":"not_required",cross_link_status:project.github_url&&project.website_url?"pending":"not_required",verification_token:token}).select("*").single()).data;
   }
   return NextResponse.json({verification});
 }
@@ -31,11 +31,11 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   let {data:v}=await db.from("project_verifications").select("*").eq("project_id",project.id).maybeSingle();
   if(!v){
     const token="phv_"+crypto.randomUUID().replace(/-/g,"");
-    v=(await db.from("project_verifications").insert({project_id:project.id,github_url:project.github_url,website_url:project.website_url,website_status:project.website_url?"pending":"not_required",cross_link_status:project.website_url?"pending":"not_required",verification_token:token}).select("*").single()).data;
+    v=(await db.from("project_verifications").insert({project_id:project.id,github_url:project.github_url,website_url:project.website_url,github_status:project.github_url?"pending":"not_required",website_status:project.website_url?"pending":"not_required",cross_link_status:project.github_url&&project.website_url?"pending":"not_required",verification_token:token}).select("*").single()).data;
   }
   if(!v) return NextResponse.json({error:"Could not initialize verification."},{status:500});
   let github=v.github_evidence||{},website=v.website_evidence||{},cross=v.cross_link_evidence||{};
-  let githubStatus=v.github_status,websiteStatus=project.website_url?v.website_status:"not_required",provenance=v.provenance_status;
+  let githubStatus=project.github_url?v.github_status:"not_required",websiteStatus=project.website_url?v.website_status:"not_required",provenance=project.github_url?v.provenance_status:"not_required";
   if(check==="github"||check==="all"){
     const result=project.github_url?await verifyGitHub(project.github_url,v.verification_token):{status:"not_required",evidence:{},method:"none"};
     github=result.evidence; githubStatus=result.status; provenance=result.evidence?.fork?"fork":"unknown";
@@ -51,7 +51,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   const overall=deriveOverallStatus(githubStatus,websiteStatus,provenance);
   const {data:updated,error}=await db.from("project_verifications").update({
     github_url:project.github_url,website_url:project.website_url,github_status:githubStatus,website_status:websiteStatus,
-    cross_link_status:project.website_url?(cross.matched===true?"verified":cross.matched===false?"failed":"pending"):"not_required",provenance_status:provenance,
+    cross_link_status:project.github_url&&project.website_url?(cross.matched===true?"verified":cross.matched===false?"failed":"pending"):"not_required",provenance_status:provenance,
     overall_status:overall,github_method:github.method||null,website_method:website.method||null,
     github_evidence:github,website_evidence:website,cross_link_evidence:cross,
     last_checked_at:new Date().toISOString(),

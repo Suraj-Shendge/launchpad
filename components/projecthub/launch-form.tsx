@@ -3,12 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, ArrowUpRight, Check, Link2, Loader2, Sparkles, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, Github, Globe2, Link2, Loader2, Sparkles, Upload, X } from "lucide-react";
 import type { Category } from "@/lib/types";
 
 type Draft={name:string;website_url:string;github_url:string;tagline:string;description:string;category_id:string;tags:string;social_links:string;logo_url:string};
 const DRAFT_KEY="projecthub:launch-draft:v1";
 const IDB_NAME="projecthub-launch-drafts";
+
+type LinkKind="github"|"website"|"unknown";
+function detectLinkKind(value:string):LinkKind{
+  try{
+    const url=new URL(value);
+    if(!["http:","https:"].includes(url.protocol)) return "unknown";
+    if(url.hostname.toLowerCase()==="github.com"&&url.pathname.split("/").filter(Boolean).length>=2) return "github";
+    return "website";
+  }catch{return "unknown";}
+}
 const IDB_STORE="files";
 
 function readStoredDraft():Draft|null {
@@ -60,7 +70,9 @@ function readLogoDraft():Promise<File|null>{
 }
 export function LaunchForm({categories,initialUrl=""}:{categories:Category[];initialUrl?:string}) {
   const router=useRouter();
-  const [form,setForm]=useState<Draft>({name:"",website_url:initialUrl,github_url:"",tagline:"",description:"",category_id:"",tags:"",social_links:"",logo_url:""});
+  const initialLinkKind=detectLinkKind(initialUrl);
+  const [form,setForm]=useState<Draft>({name:"",website_url:initialLinkKind==="website"?initialUrl:"",github_url:initialLinkKind==="github"?initialUrl:"",tagline:"",description:"",category_id:"",tags:"",social_links:"",logo_url:""});
+  const [sourceUrl,setSourceUrl]=useState(initialUrl);
   const [images,setImages]=useState<File[]>([]);
   const [previews,setPreviews]=useState<string[]>([]);
   const [logoFile,setLogoFile]=useState<File|null>(null);
@@ -74,7 +86,8 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
     const stored=readStoredDraft();
     const hasDraftContent=!!stored&&Object.values(stored).some(value=>value.trim().length>0);
     if(hasDraftContent&&stored){
-      setForm(current=>({...current,...stored,website_url:current.website_url||stored.website_url}));
+      setForm(current=>({...current,...stored}));
+      setSourceUrl(stored.github_url||stored.website_url||initialUrl);
       void readFileDraft().then(files=>{if(files.length){setImages(files);setPreviews(files.map(file=>URL.createObjectURL(file)));}});
       void readLogoDraft().then(file=>{if(file){setLogoFile(file);setLogoPreview(URL.createObjectURL(file));}});
     }else{
@@ -90,12 +103,22 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
   useEffect(()=>()=>previews.forEach(url=>URL.revokeObjectURL(url)),[previews]);
 
   function update(key:keyof Draft,value:string){setForm(current=>({...current,[key]:value}));setError("");}
-  const canFetch=useMemo(()=>/^https?:\/\//i.test(form.website_url),[form.website_url]);
+  function updateSourceUrl(value:string){
+    const previousKind=detectLinkKind(sourceUrl);
+    setSourceUrl(value);setError("");
+    const kind=detectLinkKind(value);
+    if(!value.trim()){
+      setForm(current=>({...current,github_url:previousKind==="github"?"":current.github_url,website_url:previousKind==="website"?"":current.website_url}));
+    }else if(kind==="github") setForm(current=>({...current,github_url:value}));
+    else if(kind==="website") setForm(current=>({...current,website_url:value}));
+  }
+  const sourceKind=useMemo(()=>detectLinkKind(sourceUrl),[sourceUrl]);
+  const canFetch=useMemo(()=>/^https?:\/\//i.test(sourceUrl),[sourceUrl]);
 
   async function fetchMetadata(){
-    if(!canFetch){setError("Enter a valid project URL first.");return;}
+    if(!canFetch){setError("Enter a valid GitHub or website URL first.");return;}
     setMetadataBusy(true);setError("");setNotice("");
-    const response=await fetch("/api/metadata?url="+encodeURIComponent(form.website_url));
+    const response=await fetch("/api/metadata?url="+encodeURIComponent(sourceUrl));
     const payload=await response.json().catch(()=>({}));
     setMetadataBusy(false);
     if(!response.ok){setError(payload.error||"Metadata could not be fetched.");return;}
@@ -147,7 +170,7 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
   }
 
   function cancelLaunch(){
-    clearStoredDraft();clearFileDraft();setImages([]);setForm({name:"",website_url:"",github_url:"",tagline:"",description:"",category_id:"",tags:"",social_links:"",logo_url:""});
+    clearStoredDraft();clearFileDraft();setImages([]);setSourceUrl("");setForm({name:"",website_url:"",github_url:"",tagline:"",description:"",category_id:"",tags:"",social_links:"",logo_url:""});
     router.push("/");
   }
 
@@ -155,25 +178,26 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
     <form className="launch-form" onSubmit={launchProject}>
       <div className="launch-form-grid">
         <section className="launch-main">
-          <div className="launch-step"><span>01</span><div><p className="eyebrow">Project links</p><h2>Start with your GitHub repository.</h2><p>A website is optional. GitHub is used for ownership verification; a website can be added when you have one.</p></div></div>
+          <div className="launch-step"><span>01</span><div><p className="eyebrow">Project link</p><h2>Start with GitHub or your website.</h2><p>Paste whichever public link you have. ProjectHub detects whether it is a GitHub repository or a website and uses the matching ownership check.</p></div></div>
           <div className="launch-url-row">
-            <div className="input-with-icon"><Link2 size={17}/><input value={form.website_url} onChange={e=>update("website_url",e.target.value)} placeholder="https://yourproject.com" type="url"/></div>
+            <div className="input-with-icon">{sourceKind==="github"?<Github size={17}/>:<Globe2 size={17}/>}<input value={sourceUrl} onChange={e=>updateSourceUrl(e.target.value)} placeholder="https://github.com/you/project or https://yourproject.com" type="url"/></div>
             <button type="button" className="button-soft" onClick={fetchMetadata} disabled={!canFetch||metadataBusy}>{metadataBusy?<><Loader2 size={15} className="spin"/>Fetching…</>:<><Sparkles size={15}/>Fetch details</>}</button>
           </div>
+          {sourceUrl&&sourceKind!=="unknown"&&<p className="project-source-detected"><span>{sourceKind==="github"?<Github size={13}/>:<Globe2 size={13}/>}</span>{sourceKind==="github"?"GitHub repository detected":"Website detected"}<small>{sourceKind==="github"?"GitHub ownership check":"Website ownership check"}</small></p>}
           {notice&&<p className="form-success"><Check size={14}/>{notice}</p>}
         </section>
 
         <aside className="launch-side">
           <p className="eyebrow">Launch checklist</p>
+          <div className="check-row"><span>Project link</span><strong>{sourceKind==="github"?"GitHub":sourceKind==="website"?"Website":"Pending"}</strong></div>
           <div className="check-row"><span>Website</span><strong>{form.website_url?"Ready":"Optional"}</strong></div>
           <div className="check-row"><span>Details</span><strong>{form.name&&form.tagline?"Ready":"Pending"}</strong></div>
-          <div className="check-row"><span>Category</span><strong>{form.category_id?"Ready":"Pending"}</strong></div>
-          <div className="check-row"><span>GitHub</span><strong>{form.github_url?"Ready":"Required"}</strong></div>
+          <div className="check-row"><span>GitHub</span><strong>{form.github_url?"Ready":"Optional"}</strong></div>
         </aside>
       </div>
       <section className="launch-details">
         <div className="launch-step"><span>02</span><div><p className="eyebrow">Project details</p><h2>Make the launch page yours.</h2><p>Metadata is a starting point. Everything remains editable before you submit.</p></div></div>
-        <div className="launch-requirement-note"><div><strong>GitHub ownership is the required project check.</strong><span>A website is optional. After submission, ProjectHub can verify control of your GitHub repository; moderators can then approve the project for publication without requiring website ownership.</span></div></div>
+        <div className="launch-requirement-note"><div><strong>{sourceKind==="github"?"GitHub ownership is the project check.":sourceKind==="website"?"Website ownership is the project check.":"Provide a GitHub repository or website to continue."}</strong><span>{sourceKind==="github"?"ProjectHub will verify control of your GitHub repository. A website is optional and can be checked separately.":sourceKind==="website"?"ProjectHub will verify control of your website. A GitHub repository is optional and can be checked separately.":"ProjectHub detects the source you provide and uses the matching ownership check. You can add the other source later."}</span></div></div>
         <div className="form-grid">
           <label>Project name<input value={form.name} onChange={e=>update("name",e.target.value)} maxLength={80} placeholder="Your project" required/></label>
           <label>Category<select value={form.category_id} onChange={e=>update("category_id",e.target.value)} required><option value="">Choose a category</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
@@ -182,7 +206,9 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
         <label>Description<textarea value={form.description} onChange={e=>update("description",e.target.value)} rows={7} maxLength={4000} placeholder="Explain the product, who it is for, and why it exists." required/></label>
         <div className="form-grid">
           <label>Tags<input value={form.tags} onChange={e=>update("tags",e.target.value)} placeholder="ai, saas, productivity"/></label>
-          <label className="required-field"><span className="field-label-row"><span>GitHub repository</span><span className="field-required">Required</span></span><input value={form.github_url} onChange={e=>update("github_url",e.target.value)} placeholder="https://github.com/you/project" type="url" required/><small><strong>GitHub is the required ownership check.</strong> After you submit, ProjectHub gives you a unique token. Add it to the repository to verify control. Website ownership is optional and is never required for publication.</small></label>
+          {sourceKind==="github"&&<label><span className="field-label-row"><span>Website URL</span><span className="field-optional">Optional</span></span><input value={form.website_url} onChange={e=>update("website_url",e.target.value)} placeholder="https://yourproject.com" type="url"/><small>Optional. ProjectHub can check website ownership in addition to GitHub.</small></label>}
+          {sourceKind==="website"&&<label><span className="field-label-row"><span>GitHub repository</span><span className="field-optional">Optional</span></span><input value={form.github_url} onChange={e=>update("github_url",e.target.value)} placeholder="https://github.com/you/project" type="url"/><small>Optional. Add GitHub when your project has a public repository.</small></label>}
+          {sourceKind==="unknown"&&<label><span className="field-label-row"><span>GitHub repository</span><span className="field-optional">Optional</span></span><input value={form.github_url} onChange={e=>update("github_url",e.target.value)} placeholder="https://github.com/you/project" type="url"/><small>Provide either a GitHub repository or website above to continue.</small></label>}
         </div>
         <label>Social links<input value={form.social_links} onChange={e=>update("social_links",e.target.value)} placeholder="x=https://x.com/…, linkedin=https://…"/></label>
       </section>
@@ -210,7 +236,7 @@ export function LaunchForm({categories,initialUrl=""}:{categories:Category[];ini
         <div>
           <p className="eyebrow">04 · Ready to launch</p>
           <h2>Submit for moderation.</h2>
-          <p>Your project enters moderation after submission. An approved project can be published using GitHub ownership verification; website ownership is optional.</p>
+          <p>Your project enters moderation after submission. {sourceKind==="github"?"GitHub ownership will be checked, and website ownership is optional.":sourceKind==="website"?"Website ownership will be checked, and GitHub is optional.":"ProjectHub will check the GitHub repository or website you provide."}</p>
         </div>
         {error&&<p className="form-error" role="alert">{error}</p>}
         <div className="launch-actions">

@@ -111,9 +111,10 @@ export async function verifyWebsite(url:string,token:string,githubFullName?:stri
 }
 
 export function deriveOverallStatus(github:string,website:string,provenance:string){
-  if(github==="verified"&&(website==="verified"||website==="not_required")&&provenance!=="review") return "verified";
   if(provenance==="review") return "review_required";
+  if(github==="verified"&&(website==="verified"||website==="not_required")) return "verified";
+  if(website==="verified"&&github==="not_required") return "verified";
   if(github==="verified"||website==="verified") return "partially_verified";
-  if(github==="failed"&&website==="failed") return "verification_required";
+  if((github==="failed"&& (website==="failed"||website==="not_required")) || (website==="failed"&&github==="not_required")) return "verification_required";
   return "pending";
 }

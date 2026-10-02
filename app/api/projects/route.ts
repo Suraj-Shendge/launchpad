@@ -12,7 +12,7 @@ const schema=z.object({
   category_id:z.string().uuid(),
   tags:z.string().max(500).optional(),
   social_links:z.string().max(1000).optional(),
-  github_url:z.string().url().max(500),
+  github_url:z.string().trim().url().max(500).optional().or(z.literal("")),
   logo_url:z.string().url().max(1000).optional().or(z.literal("")),
 });
 
@@ -30,12 +30,16 @@ export async function POST(request:Request){
   const parsed=schema.safeParse(Object.fromEntries(form.entries()));
   if(!parsed.success) return NextResponse.json({error:"Please check the required fields."},{status:400});
   const value=parsed.data;
-  try{
-    const github=new URL(value.github_url);
-    if(github.hostname.toLowerCase()!=="github.com" || github.pathname.split("/").filter(Boolean).length<2)
-      return NextResponse.json({error:"A valid GitHub repository URL is required."},{status:400});
-  }catch{
-    return NextResponse.json({error:"A valid GitHub repository URL is required."},{status:400});
+  if(!value.github_url && !value.website_url)
+    return NextResponse.json({error:"Enter a GitHub repository or website URL to continue."},{status:400});
+  if(value.github_url){
+    try{
+      const github=new URL(value.github_url);
+      if(github.hostname.toLowerCase()!=="github.com" || github.pathname.split("/").filter(Boolean).length<2)
+        return NextResponse.json({error:"The GitHub URL must point to a repository."},{status:400});
+    }catch{
+      return NextResponse.json({error:"The GitHub URL is not valid."},{status:400});
+    }
   }
 
   const {data:category,error:categoryError}=await supabase.from("categories").select("name").eq("id",value.category_id).maybeSingle();
@@ -85,7 +89,11 @@ export async function POST(request:Request){
   if(error) return NextResponse.json({error:error.code==="23505"?"That project URL is already taken.":"Could not create project."},{status:400});
 
   const verificationToken="phv_"+crypto.randomUUID().replace(/-/g,"");
-  const verification=await supabase.from("project_verifications").insert({project_id:project.id,github_url:value.github_url||null,website_url:value.website_url||null,verification_token:verificationToken});
+  const verification=await supabase.from("project_verifications").insert({
+    project_id:project.id,github_url:value.github_url||null,website_url:value.website_url||null,verification_token:verificationToken,
+    github_status:value.github_url?"pending":"not_required",website_status:value.website_url?"pending":"not_required",
+    cross_link_status:value.github_url&&value.website_url?"pending":"not_required"
+  });
   if(verification.error) console.error("Project verification initialization failed",verification.error);
 
   const tagNames=(value.tags||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean).slice(0,8);
