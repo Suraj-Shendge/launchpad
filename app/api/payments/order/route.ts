@@ -53,10 +53,11 @@ export async function POST(request:Request){
   if(promotionError||!promotion)return NextResponse.json({error:"Could not create promotion."},{status:500});
   const {data:paymentIntent,error:paymentIntentError}=await admin.from("payments").insert({
     user_id:user.id,project_id:project.id,promotion_id:promotion.id,
-    idempotency_key:idempotencyKey,amount,currency:"INR",status:"pending",
+    plan:"featured",provider:"razorpay",idempotency_key:idempotencyKey,amount,currency:"INR",status:"pending",
     metadata:{purpose:"featured_promotion",idempotency_key:idempotencyKey}
   }).select("id").single();
   if(paymentIntentError||!paymentIntent){
+    console.error("Featured payment intent creation failed",paymentIntentError);
     await admin.from("promotions").update({status:"cancelled"}).eq("id",promotion.id);
     const {data:racePayment}=await admin.from("payments")
       .select("id,razorpay_order_id,amount,currency,promotion_id").eq("user_id",user.id)
