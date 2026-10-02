@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { NewsletterSignup } from "@/components/projecthub/newsletter-signup";
 import { Navbar } from "@/components/projecthub/navbar";
 import { Footer } from "@/components/projecthub/footer";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Newsletter",
+  description: "Get the ProjectHub digest with new product launches, maker stories, community highlights and platform updates.",
+  alternates: { canonical: "/newsletter" },
+  openGraph: { title: "ProjectHub Newsletter", description: "New launches, maker stories and community highlights from ProjectHub.", type: "website" },
+};
 
 export default async function NewsletterPage({searchParams}:{searchParams:Promise<{confirmed?:string;error?:string}>}){
  const params=await searchParams, supabase=await createClient();

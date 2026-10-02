@@ -9,6 +9,11 @@ import { TrafficCounter } from "@/components/projecthub/traffic-counter";
 import { getHomepageAuctionWinners, getTodayLaunches, getTrendingProjects } from "@/lib/data";
 
 export default async function Home() {
+  const base=process.env.NEXT_PUBLIC_SITE_URL??"http://localhost:3000";
+  const structuredData=JSON.stringify({"@context":"https://schema.org","@graph":[
+    {"@type":"WebSite","name":"ProjectHub","url":base,"description":"Discover new products, tools, startups and ideas, or launch your own project on ProjectHub.","potentialAction":{"@type":"SearchAction","target":base+"/explore?q={search_term_string}","query-input":"required name=search_term_string"}},
+    {"@type":"Organization","name":"ProjectHub","url":base,"logo":base+"/opengraph-image.png"}
+  ]}).replace(/</g,"\\u003c");
   const [trending,launches,auctionWinners]=await Promise.all([
     getTrendingProjects(),
     getTodayLaunches(),
@@ -16,6 +21,7 @@ export default async function Home() {
   ]);
 
   return <div className="page-shell"><Navbar/><main>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{__html:structuredData}}/>
     <HomeHero auctionWinners={auctionWinners}/>
     <div className="shell home-visitor-row"><TrafficCounter/></div>
     <section className="section">

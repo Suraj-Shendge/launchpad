@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Gavel, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/projecthub/navbar";
 import { Footer } from "@/components/projecthub/footer";
+
+export const metadata: Metadata = {
+  title: "Promote your project",
+  description: "Promote a ProjectHub project with Featured placement or bid for premium homepage visibility.",
+  alternates: { canonical: "/promote" },
+  openGraph: { title: "Promote your project — ProjectHub", description: "Choose Featured promotion or homepage auction visibility for your ProjectHub launch.", type: "website" },
+};
 
 export default function Promote(){
   return <div><Navbar/><main className="section promote-page">

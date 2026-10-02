@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, BadgeCheck, Gavel } from "lucide-react";
 import { Navbar } from "@/components/projecthub/navbar";
 import { Footer } from "@/components/projecthub/footer";
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description: "See ProjectHub launch, Featured promotion and homepage auction pricing.",
+  alternates: { canonical: "/pricing" },
+  openGraph: { title: "Pricing — ProjectHub", description: "ProjectHub launch, Featured promotion and homepage auction pricing.", type: "website" },
+};
 
 export default function Pricing(){
   return <div><Navbar/><main className="section pricing-page">

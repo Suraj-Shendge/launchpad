@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Navbar } from "@/components/projecthub/navbar";
@@ -5,6 +6,13 @@ import { Footer } from "@/components/projecthub/footer";
 import { AuctionTimer } from "@/components/projecthub/auction-timer";
 import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Homepage auctions",
+  description: "Bid for premium ProjectHub homepage placements through live 24-hour auctions.",
+  alternates: { canonical: "/auctions" },
+  openGraph: { title: "Homepage auctions — ProjectHub", description: "Bid for premium ProjectHub homepage placements through live auctions.", type: "website" },
+};
 
 export default async function Auctions(){
  if(!hasEnvVars)return <div><Navbar/><main className="section auction-board"><div style={{maxWidth:720,marginBottom:42}}><p className="eyebrow">Live marketplace</p><h1 className="section-title" style={{fontSize:"clamp(44px,6vw,72px)"}}>Homepage auctions.</h1><p className="section-copy">Homepage promotion is continuously allocated through 24-hour live auctions. You bid for the next available homepage placement; the placement itself stays anonymous.</p></div><div className="empty-state"><strong>No live auctions yet.</strong><span>Connect Supabase to activate bidding, scheduling and winner payments.</span></div></main><Footer/></div>;

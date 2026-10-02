@@ -8,11 +8,12 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase:new URL(baseUrl),
-  title:{default:"ProjectHub — Launch. Discover. Promote.", template:"%s — ProjectHub"},
-  description:"A premium product discovery, launch and promotion platform for founders, developers, creators and makers.",
+  title:{default:"ProjectHub — Discover & Launch New Products, Tools & Startups", template:"%s — ProjectHub"},
+  description:"Discover new products, tools, startups and ideas on ProjectHub, or launch your own project and get discovered by founders, makers and developers.",
   alternates:{canonical:"/"},
-  openGraph:{title:"ProjectHub — Launch. Discover. Promote.",description:"Launch, discover and promote the next generation of projects.",type:"website",url:baseUrl,images:["/opengraph-image.png"]},
-  twitter:{card:"summary_large_image",title:"ProjectHub — Launch. Discover. Promote.",description:"Launch, discover and promote the next generation of projects.",images:["/twitter-image.png"]},
+  keywords:["product discovery","product launch platform","startup launches","indie makers","developer tools","new products","ProjectHub"],
+  openGraph:{title:"ProjectHub — Discover & Launch New Products, Tools & Startups",description:"Discover new products, tools, startups and ideas, or launch your own and get discovered on ProjectHub.",type:"website",url:baseUrl,images:["/opengraph-image.png"]},
+  twitter:{card:"summary_large_image",title:"ProjectHub — Discover & Launch New Products, Tools & Startups",description:"Discover new products, tools, startups and ideas, or launch your own and get discovered on ProjectHub.",images:["/twitter-image.png"]},
   robots:{index:true,follow:true},
 };
 

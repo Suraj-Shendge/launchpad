@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Navbar } from "@/components/projecthub/navbar";
@@ -6,6 +7,13 @@ import { LaunchForm } from "@/components/projecthub/launch-form";
 import { getCategories } from "@/lib/data";
 
 type Params=Promise<{url?:string}>;
+
+export const metadata: Metadata = {
+  title: "Launch your project",
+  description: "Launch your product, startup, tool or idea on ProjectHub. Start with a GitHub repository or website and submit it for review.",
+  alternates: { canonical: "/launch" },
+  openGraph: { title: "Launch your project — ProjectHub", description: "Submit your product, startup, tool or idea to ProjectHub and get discovered.", type: "website" },
+};
 
 export default async function LaunchPage({searchParams}:{searchParams:Params}){
   const params=await searchParams;
