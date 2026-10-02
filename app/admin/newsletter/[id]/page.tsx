@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { connection } from "next/server";
 import { requireAdmin, getAdminAccess } from "@/lib/auth";
 import { getNewsletterEdition, analyticsNewsletterEdition } from "@/lib/newsletter/admin-service";
 import { NewsletterEditor } from "@/components/projecthub/newsletter-editor";
 
+export const metadata: Metadata = {
+ title: "Newsletter | ProjectHub Admin",
+ robots: { index: false, follow: false },
+};
+
 export default async function EditNewsletter({params}:{params:Promise<{id:string}>}){
- await connection();
  const auth=await requireAdmin("newsletter.view"); const {access}=await getAdminAccess(); const id=(await params).id;
  const edition=await getNewsletterEdition(id);
  const analytics=edition.status==="sent"?await analyticsNewsletterEdition(id):null;

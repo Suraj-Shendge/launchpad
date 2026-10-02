@@ -8,8 +8,6 @@ import { getCategories, getExploreFeaturedProjects, getPublishedProjects } from 
 
 type Params = Promise<{q?:string;category?:string}>;
 
-export const instant = false;
-
 export async function generateMetadata({searchParams}:{searchParams:Params}):Promise<Metadata>{
   const params=await searchParams; const q=params.q?.trim()||""; const category=params.category||"";
   return {title:q?"Search: "+q:category?"Explore "+category:"Explore projects",description:"Discover published products, tools and ideas from ProjectHub makers.",alternates:{canonical:"/explore"},robots:{index:!q&&!category,follow:true},openGraph:{title:"Explore projects — ProjectHub",description:"Discover published products, tools and ideas from ProjectHub makers.",type:"website"}};
