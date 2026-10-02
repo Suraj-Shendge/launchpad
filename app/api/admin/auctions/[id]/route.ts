@@ -42,16 +42,24 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
   const now=new Date().toISOString();
   const {error:endError}=await admin.from("auctions").update({ends_at:now,updated_at:now}).eq("id",id).eq("status","active");
   if(endError)return NextResponse.json({error:endError.message},{status:500});
-  const {data:topBid,error:bidError}=await admin.from("auction_bids").select("id").eq("auction_id",id).order("amount",{ascending:false}).order("created_at",{ascending:true}).limit(1).maybeSingle();
-  if(bidError)return NextResponse.json({error:bidError.message},{status:500});
-  if(!topBid){
+  const {data:winningBid,error:winningBidError}=await admin.from("auction_bids")
+    .select("bidder_id,project_id,amount")
+    .eq("auction_id",id)
+    .order("amount",{ascending:false})
+    .order("created_at",{ascending:true})
+    .limit(1).maybeSingle();
+  if(winningBidError)return NextResponse.json({error:winningBidError.message},{status:500});
+  if(!winningBid){
    const {error:endedError}=await admin.from("auctions").update({status:"ended",updated_at:now}).eq("id",id).eq("status","active");
    if(endedError)return NextResponse.json({error:endedError.message},{status:500});
   }else{
-   const {data:settled,error:settleError}=await admin.rpc("settle_auction",{p_auction_id:id});
+   const {error:settleError}=await admin.from("auctions").update({
+    status:"settled",winner_id:winningBid.bidder_id,winning_bid:winningBid.amount,winning_project_id:winningBid.project_id||null,updated_at:now
+   }).eq("id",id).eq("status","active");
    if(settleError)return NextResponse.json({error:settleError.message},{status:500});
-   const row=Array.isArray(settled)?settled[0]:settled;
-   const payment=await createAuctionWinnerPayment(admin,row);
+   const payment=await createAuctionWinnerPayment(admin,{
+    auction_id:id,winner_id:winningBid.bidder_id,winning_bid:winningBid.amount,winning_project_id:winningBid.project_id||null
+   });
    if(!payment.ok)paymentWarning="Auction closed and settled, but the winner payment needs recovery: "+payment.status+".";
   }
  }
