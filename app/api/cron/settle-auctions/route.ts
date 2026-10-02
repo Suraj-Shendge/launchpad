@@ -108,6 +108,7 @@ export async function GET(request:Request){
       idempotency_key:fallbackKey,
       amount:Number(fallbackBid.amount),
       currency:"INR",
+      plan:"homepage",
       status:"pending",
       payment_deadline_at:fallbackDeadline,
       auction_payment_round:2,

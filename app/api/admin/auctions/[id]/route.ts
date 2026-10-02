@@ -4,7 +4,7 @@ import { requireAdminApi } from "@/lib/admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createAuctionWinnerPayment } from "@/lib/payments/auction-winner";
 
-const schema=z.object({action:z.enum(["activate","extend","cancel","close","settle"])});
+const schema=z.object({action:z.enum(["activate","extend","cancel","close","settle","recover_payment"])});
 
 export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){
  const auth=await requireAdminApi("auctions.manage");if("error" in auth)return auth.error;
@@ -63,10 +63,25 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
    if(!payment.ok)paymentWarning="Auction closed and settled, but the winner payment needs recovery: "+payment.status+".";
   }
  }
- if(action==="settle"){
-  if(auction.status!=="ended")return NextResponse.json({error:"Only ended auctions can be settled."},{status:409});
-  const {error}=await admin.rpc("settle_auction",{p_auction_id:id});
-  if(error)return NextResponse.json({error:error.message},{status:500});
+ if(action==="settle"||action==="recover_payment"){
+  if(action==="settle"){
+   if(auction.status!=="ended")return NextResponse.json({error:"Only ended auctions can be settled."},{status:409});
+   const {error}=await admin.rpc("settle_auction",{p_auction_id:id});
+   if(error)return NextResponse.json({error:error.message},{status:500});
+  }else if(auction.status!=="settled"){
+   return NextResponse.json({error:"Only settled auctions can recover a winner payment."},{status:409});
+  }
+  const {data:settledAuction,error:settledReadError}=await admin.from("auctions")
+   .select("id,status,winner_id,winning_bid,winning_project_id").eq("id",id).maybeSingle();
+  if(settledReadError)return NextResponse.json({error:settledReadError.message},{status:500});
+  if(!settledAuction||settledAuction.status!=="settled")return NextResponse.json({error:"Auction is not settled."},{status:409});
+  const payment=await createAuctionWinnerPayment(admin,{
+   auction_id:settledAuction.id,
+   winner_id:settledAuction.winner_id,
+   winning_bid:settledAuction.winning_bid,
+   winning_project_id:settledAuction.winning_project_id
+  });
+  if(!payment.ok)return NextResponse.json({error:payment.error||("Winner payment recovery failed: "+payment.status+"." )},{status:500});
  }
  const {data:{user}}=await auth.supabase.auth.getUser();
  if(user)await admin.from("admin_actions").insert({admin_id:user.id,action:"auction_"+action,target_type:"auction",target_id:id,metadata:{action}});
