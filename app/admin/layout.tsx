@@ -5,7 +5,7 @@ import { Activity, BarChart3, FileText, Gavel, LayoutDashboard, Mail, Megaphone,
 const groups=[
   {label:"Control",links:[["Overview","/admin",LayoutDashboard,"overview.view"],["Projects","/admin/projects",FileText,"projects.view"],["Reports","/admin/reports",ShieldAlert,"reports.view"],["Newsletter","/admin/newsletter",Mail,"newsletter.view"]]},
   {label:"People",links:[["Users","/admin/users",Users,"users.view"],["Community","/admin/community",MessageSquare,"community.view"]]},
-  {label:"Monetization",links:[["Promotions","/admin/promotions",Megaphone,"promotions.view"],["Auctions","/admin/auctions",Gavel,"auctions.view"],["Sponsorships","/admin/sponsorships",Megaphone,"sponsorships.view"],["Payments","/admin/payments",WalletCards,"payments.view"]]},
+  {label:"Monetization",links:[["Promotions","/admin/promotions",Megaphone,"promotions.view"],["Auctions","/admin/auctions",Gavel,"auctions.view"],["Payments","/admin/payments",WalletCards,"payments.view"]]},
   {label:"Insights",links:[["Analytics","/admin/analytics",BarChart3,"analytics.view"],["Audit log","/admin/audit",Activity,"audit.view"]]},
   {label:"System",links:[["Settings","/admin/settings",Settings,"settings.view"]]}
 ];
