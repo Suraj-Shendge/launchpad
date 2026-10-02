@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createAuctionWinnerPayment } from "@/lib/payments/auction-winner";
 import { getRazorpay } from "@/lib/payments/razorpay";
 import { hasRazorpayEnv, hasSupabaseServerEnv } from "@/lib/utils";
 import { serviceUnavailable } from "@/lib/api-response";
@@ -31,60 +32,13 @@ export async function GET(request:Request){
       continue;
     }
     settled++;
-
-    const winningProjectId=settledRow.winning_project_id||settledRow.project_id;
-    if(!winningProjectId)continue;
-    const idempotencyKey="auction:"+auction.id;
-    const {data:paymentIntent,error:paymentIntentError}=await admin.from("payments").insert({
-      user_id:settledRow.winner_id,
-      project_id:winningProjectId,
+    const payment=await createAuctionWinnerPayment(admin,{
       auction_id:auction.id,
-      idempotency_key:idempotencyKey,
-      amount:Number(settledRow.winning_bid),
-      currency:"INR",
-      status:"pending",
-      payment_deadline_at:new Date(Date.now()+15*60*1000).toISOString(),
-      auction_payment_round:1,
-      metadata:{purpose:"auction_winner_payment",idempotency_key:idempotencyKey,claimant_id:settledRow.winner_id}
-    }).select("id").single();
-    if(paymentIntentError||!paymentIntent){
-      if(paymentIntentError?.code==="23505")continue;
-      continue;
-    }
-
-    let order;
-    try {
-      order=await getRazorpay().orders.create({
-        amount:Math.round(Number(settledRow.winning_bid)*100),
-        currency:"INR",
-        receipt:"ph_auction_"+auction.id,
-        notes:{auction_id:auction.id,user_id:settledRow.winner_id}
-      });
-    } catch {
-      await admin.from("payments").update({status:"failed",updated_at:new Date().toISOString()})
-        .eq("id",paymentIntent.id).eq("status","pending");
-      continue;
-    }
-
-    const {error:paymentUpdateError}=await admin.from("payments").update({
-      razorpay_order_id:order.id,updated_at:new Date().toISOString()
-    }).eq("id",paymentIntent.id).eq("status","pending");
-    if(!paymentUpdateError){
-      orders++;
-      const {data:projectForNotice}=await admin.from("projects").select("slug").eq("id",winningProjectId).maybeSingle();
-      const {data:existingNotice}=await admin.from("notifications").select("id")
-        .eq("user_id",settledRow.winner_id).eq("type","auction_payment_due")
-        .eq("reference_type","auction").eq("reference_id",auction.id).maybeSingle();
-      if(!existingNotice&&projectForNotice?.slug)await admin.from("notifications").insert({
-        user_id:settledRow.winner_id,
-        type:"auction_payment_due",
-        title:"You won an auction",
-        message:"Complete your homepage placement payment within 15 minutes to keep the placement.",
-        link:"/projects/"+projectForNotice.slug,
-        reference_type:"auction",
-        reference_id:auction.id
-      });
-    }
+      winner_id:settledRow.winner_id,
+      winning_bid:settledRow.winning_bid,
+      winning_project_id:settledRow.winning_project_id
+    });
+    if(payment.status==="created")orders++;
   }
 
   const {data:expiredClaims}=await admin.from("payments")
