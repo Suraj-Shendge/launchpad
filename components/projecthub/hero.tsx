@@ -9,9 +9,9 @@ export function HomeHero({auctionWinners}:{auctionWinners:Winner[]}) {
   return (
     <section className="hero">
       <div className="hero-copy">
-        <div className="eyebrow-row"><span className="eyebrow-dot"/><span>For founders, makers & builders</span></div>
-        <h1>Launch what you’re building.<br/><em>Get it discovered.</em></h1>
-        <p>ProjectHub is the launchpad for independent products, experiments and startups.</p>
+        <div className="eyebrow-row"><span className="eyebrow-dot"/><span>Product discovery for founders & makers</span></div>
+        <h1>Discover new products & tools.<br/><em>Launch yours. Get discovered.</em></h1>
+        <p>ProjectHub is a product discovery and launch platform for founders, indie makers and developers to showcase startups, products, tools and ideas.</p>
         <form className="hero-launch" action="/launch" method="get">
           <Sparkles size={18}/>
           <input name="url" type="url" placeholder="Paste your project URL" aria-label="Project URL" required/>
