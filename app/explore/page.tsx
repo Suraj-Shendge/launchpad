@@ -37,7 +37,7 @@ export default async function Explore({searchParams}:{searchParams:Params}) {
       <div className="explore-featured-head"><div><p className="eyebrow">Featured</p><h2 id="explore-featured-title">Featured projects.</h2></div></div>
       <div className="explore-featured-grid">{featuredSlots.map((project,index)=>project
         ? <ProjectCard key={project.id} project={project}/>
-        : <div className="explore-featured-slot" key={"slot-"+index}><strong>Feature Your Project Here</strong><small>Get your project featured above Explore.</small></div>
+        : <Link className="explore-featured-slot" key={"slot-"+index} href="/dashboard/promotions/new" aria-label="Feature your project on Explore"><strong>Feature Your Project Here</strong><small>Get your project featured above Explore.</small></Link>
       )}</div>
     </section>}
     <form className="search-bar explore-search" action="/explore">

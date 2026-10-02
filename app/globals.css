@@ -1257,3 +1257,7 @@ main{min-height:calc(100vh - 72px)}.hero{width:min(1180px,calc(100% - 40px));mar
 .explore-page .explore-search{width:100%;max-width:none;align-self:stretch}
 .explore-featured-slot strong{font-size:14px}
 .explore-featured-slot small{max-width:190px;font-size:10px}
+
+.explore-featured-slot{text-decoration:none;cursor:pointer;transition:transform .2s,border-color .2s,background .2s,box-shadow .2s}
+.explore-featured-slot:hover{transform:translateY(-3px);border-color:#bdbbb4;background:#fff;box-shadow:0 14px 32px rgba(28,27,24,.06)}
+.explore-featured-slot:hover strong{text-decoration:underline;text-underline-offset:4px}
