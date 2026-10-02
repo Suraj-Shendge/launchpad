@@ -34,10 +34,10 @@ export default async function Explore({searchParams}:{searchParams:Params}) {
       <p className="section-copy">Search by name, description, category or tags and discover what makers are shipping.</p>
     </div>
     {featured.length>0&&<section className="explore-featured" aria-labelledby="explore-featured-title">
-      <div className="explore-featured-head"><div><p className="eyebrow">Featured</p><h2 id="explore-featured-title">Featured projects.</h2></div><span>{featured.length}/5 spots</span></div>
+      <div className="explore-featured-head"><div><p className="eyebrow">Featured</p><h2 id="explore-featured-title">Featured projects.</h2></div></div>
       <div className="explore-featured-grid">{featuredSlots.map((project,index)=>project
         ? <ProjectCard key={project.id} project={project}/>
-        : <div className="explore-featured-slot" key={"slot-"+index}><span>Slot {index+1}</span><strong>Featured slot available</strong><small>Your project can appear here above Explore.</small></div>
+        : <div className="explore-featured-slot" key={"slot-"+index}><strong>Feature Your Project Here</strong><small>Get your project featured above Explore.</small></div>
       )}</div>
     </section>}
     <form className="search-bar explore-search" action="/explore">
