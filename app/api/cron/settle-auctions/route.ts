@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createAuctionWinnerPayment } from "@/lib/payments/auction-winner";
 import { getRazorpay } from "@/lib/payments/razorpay";
+import { sendAuctionNotificationEmail } from "@/lib/auction-notification-email";
 import { hasRazorpayEnv, hasSupabaseServerEnv } from "@/lib/utils";
 import { serviceUnavailable } from "@/lib/api-response";
 
@@ -48,7 +49,7 @@ export async function GET(request:Request){
       .eq("reference_id",auction.id)
       .maybeSingle();
     if(!existingEndingNotice){
-      await admin.from("notifications").insert({
+      const {data:newNotification}=await admin.from("notifications").insert({
         user_id:topBid.bidder_id,
         type:"auction_ending_soon",
         title:"Auction ending soon",
@@ -57,7 +58,8 @@ export async function GET(request:Request){
         link:"/auctions/"+auction.id,
         reference_type:"auction",
         reference_id:auction.id
-      });
+      }).select("id,user_id,type,title,message,link").single();
+      if(newNotification) await sendAuctionNotificationEmail(admin,newNotification);
     }
   }
 
@@ -186,6 +188,14 @@ export async function GET(request:Request){
       reference_id:auction.id
     });
   }
+
+  const {data:pendingEmailNotifications}=await admin.from("notifications")
+    .select("id,user_id,type,title,message,link")
+    .in("type",["auction_outbid","auction_ending_soon"])
+    .is("email_sent_at",null)
+    .order("created_at",{ascending:true})
+    .limit(100);
+  for(const notification of pendingEmailNotifications??[]) await sendAuctionNotificationEmail(admin,notification);
 
   const {data:cycleResult,error:cycleSyncError}=await admin.rpc("sync_homepage_auction_cycle");
   if(cycleSyncError)return NextResponse.json({error:cycleSyncError.message,settled,orders},{status:500});

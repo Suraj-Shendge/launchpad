@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendAuctionNotificationEmail } from "@/lib/auction-notification-email";
 import { hasEnvVars } from "@/lib/utils";
 import { serviceUnavailable } from "@/lib/api-response";
 
@@ -16,5 +18,13 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
  if(!parsed.success)return NextResponse.json({error:"Invalid bid amount or project."},{status:400});
  const {data,error}=await supabase.rpc("place_bid",{p_auction_id:id,p_amount:parsed.data.amount,p_project_id:parsed.data.project_id});
  if(error)return NextResponse.json({error:error.message.replace(/^.*?DETAIL:\s*/,"")},{status:400});
+ const bid=data as {id?:string}|null;
+ if(bid?.id){
+  const admin=createAdminClient();
+  const {data:outbidNotifications}=await admin.from("notifications")
+   .select("id,user_id,type,title,message,link")
+   .eq("type","auction_outbid").eq("reference_type","auction").eq("reference_id",bid.id).is("email_sent_at",null);
+  for(const notification of outbidNotifications??[]) await sendAuctionNotificationEmail(admin,notification);
+ }
  return NextResponse.json({bid:data});
 }
