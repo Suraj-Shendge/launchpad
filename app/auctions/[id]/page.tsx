@@ -38,7 +38,7 @@ export default async function AuctionDetail({params}:{params:Promise<{id:string}
      <div><span>Bidders</span><strong>{Number(auction.bidder_count??0)}</strong></div>
      <div><span>Total bids</span><strong>{Number(auction.bid_count??0)}</strong></div>
     </div>
-    <AuctionBidHistory bids={bidHistory}/>
+    <AuctionBidHistory auctionId={auction.id} bids={bidHistory}/>
     <section className="auction-info-section"><div className="auction-section-heading"><div><p className="eyebrow">The process</p><h2>How this auction works</h2></div></div><div className="auction-steps">
       <div><b>01</b><strong>Choose your project</strong><span>Select one of your published ProjectHub projects.</span></div>
       <div><b>02</b><strong>Place your bid</strong><span>Submit a bid at or above the current minimum.</span></div>

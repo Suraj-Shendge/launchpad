@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type BidProject={id:string;name:string};
 
 export function BidForm({auctionId,minimum,projects}:{auctionId:string;minimum:number;projects:BidProject[]}) {
+  const router=useRouter();
   const [amount,setAmount]=useState(String(minimum));
   const [projectId,setProjectId]=useState(projects[0]?.id??"");
   const [busy,setBusy]=useState(false);
@@ -19,7 +21,12 @@ export function BidForm({auctionId,minimum,projects}:{auctionId:string;minimum:n
     });
     const payload=await response.json().catch(()=>({}));
     setBusy(false);
-    setMessage(response.ok ? "Bid placed successfully." : (payload.error || "Bid could not be placed."));
+    if(response.ok){
+      setMessage("Bid placed successfully. Updating the auction…");
+      router.refresh();
+      return;
+    }
+    setMessage(payload.error || "Bid could not be placed.");
   }
   return <form className="bid-form" onSubmit={placeBid}>
     {projects.length>1&&<select aria-label="Project to promote if you win" value={projectId} onChange={e=>setProjectId(e.target.value)}>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}</select>}

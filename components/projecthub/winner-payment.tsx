@@ -11,7 +11,7 @@ declare global {
 
 export function WinnerPayment({orderId,amount,keyId,expiresAt}:{orderId:string;amount:number;keyId:string;expiresAt?:string|null}) {
   const [busy,setBusy]=useState(false);
-  const [remainingMs,setRemainingMs]=useState(expiresAt?Math.max(0,new Date(expiresAt).getTime()-Date.now()):0);
+  const [remainingMs,setRemainingMs]=useState(0);
   useEffect(()=>{
     if(!expiresAt)return;
     const tick=()=>setRemainingMs(Math.max(0,new Date(expiresAt).getTime()-Date.now()));
