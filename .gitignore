@@ -45,3 +45,5 @@ next-env.d.ts
 /supabase/.temp/
 # local diagnostic scratch
 /tmp-route-info.txt
+
+.vercel
