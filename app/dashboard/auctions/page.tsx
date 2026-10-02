@@ -15,9 +15,10 @@ export default async function DashboardAuctions(){
   const [{data:bids},{data:wins},{data:payments}]=await Promise.all([
     supabase.from("dashboard_auction_bids").select("id,amount,created_at,auction_id,ends_at,status").order("created_at",{ascending:false}),
     supabase.from("dashboard_auction_wins").select("id,winning_bid,ends_at,status,project_name,project_slug").order("ends_at",{ascending:false}),
-    supabase.from("payments").select("id,auction_id,razorpay_order_id,amount,status").eq("user_id",user.id).not("auction_id","is",null),
+    supabase.from("payments").select("id,auction_id,razorpay_order_id,amount,status,payment_deadline_at").eq("user_id",user.id).not("auction_id","is",null).order("created_at",{ascending:false}),
   ]);
-  const paymentMap=new Map((payments??[]).map((payment:any)=>[payment.auction_id,payment]));
+  const paymentMap=new Map<string,any>();
+  for(const payment of payments??[]) if(payment.auction_id&&!paymentMap.has(payment.auction_id))paymentMap.set(payment.auction_id,payment);
 
   return <div><Navbar authenticated/><main className="dashboard-shell shell">
     <div className="dashboard-head"><div><p className="eyebrow">Auctions</p><h1>Your auction activity.</h1><p>Review bids, wins and winner payments.</p></div><Link href="/auctions" className="button-primary">Live auctions</Link></div>
@@ -27,7 +28,9 @@ export default async function DashboardAuctions(){
         <div><strong>{auction.project_name||"Project"}</strong><span>Winning bid · ₹{Number(auction.winning_bid).toLocaleString("en-IN")}</span></div>
         <div className="list-row-right">
           {payment?.status==="paid" ? <span className="state-chip">Paid</span>
-           : payment?.razorpay_order_id ? <WinnerPayment orderId={payment.razorpay_order_id} amount={Number(payment.amount)} keyId={process.env.RAZORPAY_KEY_ID||""}/>
+           : payment?.status==="expired" ? <span className="state-chip">Payment window expired</span>
+           : payment?.status==="failed" ? <span className="state-chip">Payment failed</span>
+           : payment?.razorpay_order_id ? <WinnerPayment orderId={payment.razorpay_order_id} amount={Number(payment.amount)} keyId={process.env.RAZORPAY_KEY_ID||""} expiresAt={payment.payment_deadline_at}/>
            : <span className="state-chip">Payment pending</span>}
         </div>
       </div>;

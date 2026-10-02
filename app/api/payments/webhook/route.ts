@@ -31,14 +31,15 @@ export async function POST(request:Request){
   if(!orderId||!status)return NextResponse.json({ok:true});
 
   const {data:payment}=await admin.from("payments")
-    .select("id,status").eq("razorpay_order_id",orderId).maybeSingle();
+    .select("id,status,auction_id,payment_deadline_at").eq("razorpay_order_id",orderId).maybeSingle();
   if(!payment)return NextResponse.json({ok:true});
   await admin.from("payment_events").update({payment_id:payment.id}).eq("id",eventRecord.id);
 
   if(status==="paid"){
     if(payment.status!=="refunded") await finalizePayment(admin,payment.id,paymentId);
   } else if(status==="failed"){
-    if(payment.status!=="paid"&&payment.status!=="refunded"){
+    const auctionWindowOpen=Boolean(payment.auction_id&&payment.payment_deadline_at&&new Date(payment.payment_deadline_at).getTime()>Date.now());
+    if(!auctionWindowOpen&&payment.status!=="paid"&&payment.status!=="refunded"){
       await admin.from("payments").update({status:"failed",updated_at:new Date().toISOString()})
         .eq("id",payment.id).neq("status","paid").neq("status","refunded");
     }
@@ -68,10 +69,15 @@ export async function POST(request:Request){
       if(paymentDetail?.user_id){
         const {data:existingNotification}=await admin.from("notifications").select("id")
           .eq("user_id",paymentDetail.user_id).eq("type","payment_refunded")
-          .contains("data",{payment_id:payment.id}).maybeSingle();
+          .eq("reference_type","payment").eq("reference_id",payment.id).maybeSingle();
         if(!existingNotification) await admin.from("notifications").insert({
-          user_id:paymentDetail.user_id,type:"payment_refunded",title:"Payment refunded",
-          body:"Your ProjectHub payment was refunded.",data:{payment_id:payment.id}
+          user_id:paymentDetail.user_id,
+          type:"payment_refunded",
+          title:"Payment refunded",
+          message:"Your ProjectHub payment was refunded.",
+          link:"/dashboard/payments",
+          reference_type:"payment",
+          reference_id:payment.id
         });
       }
     }

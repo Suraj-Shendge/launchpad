@@ -6,10 +6,15 @@ export async function finalizePayment(
   razorpayPaymentId?:string
 ){
   const {data:payment}=await admin.from("payments")
-    .select("id,user_id,promotion_id,auction_id,status,amount,razorpay_payment_id")
+    .select("id,user_id,promotion_id,auction_id,status,amount,razorpay_payment_id,payment_deadline_at")
     .eq("id",paymentId).maybeSingle();
   if(!payment)return {ok:false,reason:"payment_not_found"};
   if(payment.status==="refunded")return {ok:true,reason:"payment_already_refunded"};
+  if(["failed","expired"].includes(payment.status))return {ok:false,reason:"payment_not_payable"};
+  if(payment.auction_id){
+    if(!payment.payment_deadline_at || new Date(payment.payment_deadline_at).getTime()<=Date.now())
+      return {ok:false,reason:"auction_payment_window_expired"};
+  }
 
   if(payment.status==="paid"){
     if(razorpayPaymentId&&!payment.razorpay_payment_id){
@@ -39,8 +44,10 @@ export async function finalizePayment(
         user_id:payment.user_id,
         type:"promotion_activated",
         title:"Promotion activated",
-        body:"Your featured project promotion is now active.",
-        data:{promotion_id:promotion.id}
+        message:"Your featured project promotion is now active.",
+        link:"/dashboard/promotions",
+        reference_type:"promotion",
+        reference_id:promotion.id
       });
     }
   }
@@ -96,13 +103,15 @@ export async function finalizePayment(
 
       const {data:existingNotification}=await admin.from("notifications").select("id")
         .eq("user_id",payment.user_id).eq("type","auction_won")
-        .contains("data",{auction_id:auction.id}).maybeSingle();
+        .eq("reference_type","auction").eq("reference_id",auction.id).maybeSingle();
       if(!existingNotification) await admin.from("notifications").insert({
         user_id:payment.user_id,
         type:"auction_won",
         title:"Auction won",
-        body:"Your homepage placement payment was verified and the placement is active.",
-        data:{auction_id:auction.id}
+        message:"Your homepage placement payment was verified and the placement is active.",
+        link:"/projects/"+winningProjectId,
+        reference_type:"auction",
+        reference_id:auction.id
       });
     }
   }

@@ -59,6 +59,7 @@ export function PromoteCheckout({projects,price}:{projects:{id:string;name:strin
     {projects.length ? <>
       <div className="checkout-total"><span>Featured promotion</span><strong>₹{price.toLocaleString("en-IN")}</strong></div>
       <button className="button-primary" onClick={start} disabled={busy}>{busy?"Opening checkout…":"Continue to payment"}</button>
+      <a className="payment-policy-link" href="/refund-policy">Refund policy</a>
       {error&&<p className="form-error" role="alert">{error}</p>}
     </> : <div className="empty-state"><strong>No published projects available.</strong><span>Publish a project before purchasing featured placement.</span></div>}
   </div>;

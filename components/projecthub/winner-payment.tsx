@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 declare global {
   interface Window {
@@ -9,10 +9,22 @@ declare global {
   }
 }
 
-export function WinnerPayment({orderId,amount,keyId}:{orderId:string;amount:number;keyId:string}) {
+export function WinnerPayment({orderId,amount,keyId,expiresAt}:{orderId:string;amount:number;keyId:string;expiresAt?:string|null}) {
   const [busy,setBusy]=useState(false);
+  const [remainingMs,setRemainingMs]=useState(expiresAt?Math.max(0,new Date(expiresAt).getTime()-Date.now()):0);
+  useEffect(()=>{
+    if(!expiresAt)return;
+    const tick=()=>setRemainingMs(Math.max(0,new Date(expiresAt).getTime()-Date.now()));
+    tick();
+    const timer=window.setInterval(tick,1000);
+    return ()=>window.clearInterval(timer);
+  },[expiresAt]);
+  const expired=Boolean(expiresAt)&&remainingMs<=0;
+  const remainingSeconds=Math.ceil(remainingMs/1000);
+  const countdown=Math.floor(remainingSeconds/60).toString().padStart(2,"0")+":"+String(remainingSeconds%60).padStart(2,"0");
   const [error,setError]=useState("");
   async function pay(){
+    if(expired)return;
     setBusy(true);setError("");
     if(!window.Razorpay){setBusy(false);setError("Payment checkout is not ready.");return}
     const checkout=new window.Razorpay({
@@ -39,8 +51,9 @@ export function WinnerPayment({orderId,amount,keyId}:{orderId:string;amount:numb
   }
   return <div className="winner-payment">
     <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive"/>
-    <div><span>Winner payment</span><strong>₹{amount.toLocaleString("en-IN")}</strong></div>
-    <button className="button-primary" onClick={pay} disabled={busy}>{busy?"Opening…":"Pay now"}</button>
+    <div><span>Winner payment</span><strong>₹{amount.toLocaleString("en-IN")}</strong>{expiresAt&&!expired&&<small>Payment window · {countdown}</small>}{expired&&<small>Payment window expired</small>}</div>
+    {!expired&&<button className="button-primary" onClick={pay} disabled={busy}>{busy?"Opening…":"Complete payment"}</button>}
+    <a className="payment-policy-link" href="/refund-policy">Refund policy</a>
     {error&&<p className="form-error">{error}</p>}
   </div>;
 }
