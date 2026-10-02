@@ -5,6 +5,10 @@ import { NextResponse } from "next/server";
 function privateIp(ip:string){
   if(isIP(ip)===6){
     const value=ip.toLowerCase();
+    if(value.startsWith("::ffff:")){
+      const mapped=value.slice(7);
+      if(isIP(mapped)===4)return privateIp(mapped);
+    }
     return value==="::1"||value.startsWith("fc")||value.startsWith("fd")||value.startsWith("fe80:");
   }
   const [a,b]=ip.split(".").map(Number);
@@ -32,7 +36,7 @@ export async function GET(request:Request){
     let response:Response|null=null;
 
     for(let attempt=0;attempt<3;attempt++){
-      response=await fetch(target,{redirect:"manual",cache:"no-store",headers:{"user-agent":"ProjectHub Image Proxy/1.0"}});
+      response=await fetch(target,{redirect:"manual",cache:"no-store",headers:{"user-agent":"ProjectHub Image Proxy/1.0"},signal:AbortSignal.timeout(10000)});
       if(response.status<300||response.status>=400)break;
       const location=response.headers.get("location");
       if(!location)break;

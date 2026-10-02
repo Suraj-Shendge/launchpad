@@ -5,6 +5,10 @@ import { isIP } from "node:net";
 function privateIp(ip:string){
   if(isIP(ip)===6){
     const value=ip.toLowerCase();
+    if(value.startsWith("::ffff:")){
+      const mapped=value.slice(7);
+      if(isIP(mapped)===4)return privateIp(mapped);
+    }
     return value==="::1" || value.startsWith("fc") || value.startsWith("fd") || value.startsWith("fe80:");
   }
   const [a,b]=ip.split(".").map(Number);
@@ -40,7 +44,7 @@ export async function GET(request:Request){
     let target=await safeUrl(raw);
     let response:Response|null=null;
     for(let attempt=0;attempt<3;attempt++){
-      response=await fetch(target,{headers:{"user-agent":"ProjectHub Metadata Bot/1.0"},"redirect":"manual","cache":"no-store"});
+      response=await fetch(target,{headers:{"user-agent":"ProjectHub Metadata Bot/1.0"},"redirect":"manual","cache":"no-store",signal:AbortSignal.timeout(10000)});
       if(response.status<300||response.status>=400) break;
       const location=response.headers.get("location");
       if(!location) break;
@@ -49,6 +53,8 @@ export async function GET(request:Request){
     if(!response?.ok) return NextResponse.json({error:"The website could not be read."},{status:422});
     const type=response.headers.get("content-type")||"";
     if(!type.includes("text/html")) return NextResponse.json({error:"That URL does not point to a web page."},{status:422});
+    const contentLength=Number(response.headers.get("content-length")||0);
+    if(contentLength>500000) return NextResponse.json({error:"That web page is too large to read safely."},{status:422});
     const html=(await response.text()).slice(0,150000);
     const title=pick(html,[/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i,/<title[^>]*>([\s\S]*?)<\/title>/i]);
     const description=pick(html,[/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i]);
