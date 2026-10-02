@@ -11,7 +11,7 @@ export async function finalizePayment(
   if(!payment)return {ok:false,reason:"payment_not_found"};
   if(payment.status==="refunded")return {ok:true,reason:"payment_already_refunded"};
   if(["failed","expired"].includes(payment.status))return {ok:false,reason:"payment_not_payable"};
-  if(payment.auction_id){
+  if(payment.auction_id&&payment.status!=="paid"){
     if(!payment.payment_deadline_at || new Date(payment.payment_deadline_at).getTime()<=Date.now())
       return {ok:false,reason:"auction_payment_window_expired"};
   }
@@ -77,28 +77,34 @@ export async function finalizePayment(
         .eq("homepage_slot",auction.homepage_slot)
         .in("status",["active","scheduled"]).maybeSingle();
 
-      if(!existing){
+      let promotionId=existing?.id??null;
+      if(!promotionId){
         const {data:type}=await admin.from("promotion_types")
           .select("id").eq("slug","featured").maybeSingle();
-        if(type){
-          const start=new Date(Math.max(Date.now(),new Date(auction.ends_at).getTime()));
-          const end=new Date(start.getTime()+duration*86400000);
-          const {data:createdPromotion}=await admin.from("promotions").insert({
-            project_id:winningProjectId,
-            user_id:payment.user_id,
-            type_id:type.id,
-            position_id:auction.position_id,
-            homepage_slot:auction.homepage_slot,
-            amount:Number(auction.winning_bid??payment.amount),
-            duration_days:duration,
-            status:"active",
-            starts_at:start.toISOString(),
-            ends_at:end.toISOString()
-          }).select("id").single();
-          if(createdPromotion&&auction.homepage_slot){
-            await admin.from("homepage_slots").update({active_promotion_id:createdPromotion.id}).eq("slot_number",auction.homepage_slot);
-          }
-        }
+        if(!type)return {ok:false,reason:"promotion_type_not_configured"};
+        const start=new Date(Math.max(Date.now(),new Date(auction.ends_at).getTime()));
+        const end=new Date(start.getTime()+duration*86400000);
+        const {data:createdPromotion,error:promotionError}=await admin.from("promotions").insert({
+          project_id:winningProjectId,
+          user_id:payment.user_id,
+          type:"homepage",
+          type_id:type.id,
+          position_id:auction.position_id,
+          homepage_slot:auction.homepage_slot,
+          homepage_auction_id:auction.id,
+          amount:Number(auction.winning_bid??payment.amount),
+          duration_days:duration,
+          status:"active",
+          starts_at:start.toISOString(),
+          ends_at:end.toISOString()
+        }).select("id").single();
+        if(promotionError||!createdPromotion)return {ok:false,reason:"promotion_creation_failed"};
+        promotionId=createdPromotion.id;
+      }
+      if(promotionId&&auction.homepage_slot){
+        const {error:slotError}=await admin.from("homepage_slots")
+          .update({active_promotion_id:promotionId}).eq("slot_number",auction.homepage_slot);
+        if(slotError)return {ok:false,reason:"homepage_slot_activation_failed"};
       }
 
       const {data:existingNotification}=await admin.from("notifications").select("id")

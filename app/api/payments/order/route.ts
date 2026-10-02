@@ -43,7 +43,7 @@ export async function POST(request:Request){
   const {data:position}=await admin.from("promotion_positions").select("id").eq("slug","explore-featured").single();
   if(!type||!position)return NextResponse.json({error:"Promotion configuration is incomplete."},{status:500});
   const {data:promotion,error:promotionError}=await admin.from("promotions").insert({
-    project_id:project.id,user_id:user.id,type_id:type.id,position_id:position.id,amount,
+    project_id:project.id,user_id:user.id,type:"featured",type_id:type.id,position_id:position.id,amount,
     duration_days:type.default_duration_days,status:"pending"
   }).select("id").single();
   if(promotionError||!promotion)return NextResponse.json({error:"Could not create promotion."},{status:500});
