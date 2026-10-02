@@ -42,6 +42,10 @@ export async function POST(request:Request){
   const {data:type}=await admin.from("promotion_types").select("id,default_duration_days").eq("slug","featured").single();
   const {data:position}=await admin.from("promotion_positions").select("id").eq("slug","explore-featured").single();
   if(!type||!position)return NextResponse.json({error:"Promotion configuration is incomplete."},{status:500});
+  const {count:activeFeatured}=await admin.from("promotions").select("id",{count:"exact",head:true})
+    .eq("type","featured").eq("position_id",position.id).eq("status","active")
+    .lte("starts_at",new Date().toISOString()).gt("ends_at",new Date().toISOString());
+  if((activeFeatured??0)>=5)return NextResponse.json({error:"All 5 Featured slots on Explore are currently occupied. Please try again when a slot opens."},{status:409});
   const {data:promotion,error:promotionError}=await admin.from("promotions").insert({
     project_id:project.id,user_id:user.id,type:"featured",type_id:type.id,position_id:position.id,amount,
     duration_days:type.default_duration_days,status:"pending"

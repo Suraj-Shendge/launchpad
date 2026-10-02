@@ -53,6 +53,16 @@ export async function getPublishedProjects(opts?:{search?:string;category?:strin
   return attachProjectEngagement(supabase,(data??[]).map(r=>mapProject(r as ProjectRow)));
 }
 
+export async function getExploreFeaturedProjects():Promise<Project[]> {
+  const supabase=await client(); if(!supabase) return [];
+  const {data:ids,error}=await supabase.rpc("get_explore_featured_project_ids",{p_limit:5});
+  if(error||!ids?.length) return [];
+  const projectIds=(ids as Array<{project_id:string}>).map(row=>row.project_id);
+  const {data}=await supabase.from("project_directory").select("*").in("id",projectIds).eq("status","published");
+  const lookup=new Map((data??[]).map(row=>[row.id,mapProject(row as ProjectRow)]));
+  return attachProjectEngagement(supabase,projectIds.map(id=>lookup.get(id)).filter(Boolean) as Project[]);
+}
+
 export async function getTodayLaunches():Promise<Project[]> {
   const supabase=await client(); if(!supabase) return [];
   const start=new Date(); start.setUTCHours(0,0,0,0);

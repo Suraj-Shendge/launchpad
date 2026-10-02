@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Navbar } from "@/components/projecthub/navbar";
 import { Footer } from "@/components/projecthub/footer";
 import { ProjectCard } from "@/components/projecthub/project-card";
-import { getCategories, getPublishedProjects } from "@/lib/data";
+import { getCategories, getExploreFeaturedProjects, getPublishedProjects } from "@/lib/data";
 
 type Params = Promise<{q?:string;category?:string}>;
 
@@ -19,9 +19,10 @@ export default async function Explore({searchParams}:{searchParams:Params}) {
   const params=await searchParams;
   const q=params.q?.trim() || "";
   const category=params.category || "";
-  const [projects,categories]=await Promise.all([
+  const [projects,categories,featured]=await Promise.all([
     getPublishedProjects({search:q,category,limit:48}),
     getCategories(),
+    getExploreFeaturedProjects(),
   ]);
   return <div><Navbar/><main className="section" style={{paddingTop:50}}>
     <div style={{maxWidth:780,marginBottom:40}}>
@@ -29,6 +30,10 @@ export default async function Explore({searchParams}:{searchParams:Params}) {
       <h1 className="section-title" style={{fontSize:"clamp(42px,5vw,64px)"}}>Explore projects.</h1>
       <p className="section-copy">Search by name, description, category or tags and discover what makers are shipping.</p>
     </div>
+    {featured.length>0&&<section className="explore-featured" aria-labelledby="explore-featured-title">
+      <div className="explore-featured-head"><div><p className="eyebrow">Featured</p><h2 id="explore-featured-title">Featured projects.</h2></div><span>{featured.length}/5 spots</span></div>
+      <div className="explore-featured-grid">{featured.map(project=><ProjectCard key={project.id} project={project}/>)}</div>
+    </section>}
     <form className="search-bar" action="/explore">
       <Search size={17}/><input name="q" defaultValue={q} placeholder="Search projects, tools, ideas..." aria-label="Search projects"/>
       {category && <input type="hidden" name="category" value={category}/>}<button type="submit">Search</button>
