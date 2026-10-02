@@ -9,7 +9,7 @@ export async function GET(request:NextRequest){
  const oauthError=searchParams.get("error");
  const oauthErrorDescription=searchParams.get("error_description");
  const nextParam=searchParams.get("next")??"/dashboard";
- const next=nextParam.startsWith("/")?nextParam:"/dashboard";
+ const next=nextParam.startsWith("/")&&!nextParam.startsWith("//")?nextParam:"/dashboard";
  if(oauthError)return NextResponse.redirect(new URL("/auth/error?error="+encodeURIComponent(oauthErrorDescription||oauthError),origin));
  if(!code)return NextResponse.redirect(new URL("/auth/error?error=Missing authentication code",origin));
  const supabase=await createClient();

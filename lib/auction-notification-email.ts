@@ -1,6 +1,7 @@
 ﻿import { AuctionNotificationEmail } from "@/emails/auction-notification";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getNewsletterFrom, getResend } from "@/lib/resend";
+import { getSiteUrl } from "@/lib/site-url";
 
 type AdminClient=ReturnType<typeof createAdminClient>;
 
@@ -14,8 +15,7 @@ export async function sendAuctionNotificationEmail(admin:AdminClient,notificatio
     const {data:userData}=await admin.auth.admin.getUserById(notification.user_id);
     const email=userData.user?.email;
     if(!email) return {ok:false,status:"missing_email" as const};
-    const siteUrl=process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/,"")||"";
-    if(!siteUrl) return {ok:false,status:"site_url_missing" as const};
+    const siteUrl=getSiteUrl();
     const relative=notification.link||"/auctions";
     const actionUrl=relative.startsWith("http")?relative:siteUrl+relative;
     const result=await getResend().emails.send({

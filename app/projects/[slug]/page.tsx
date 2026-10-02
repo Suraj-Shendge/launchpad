@@ -16,11 +16,12 @@ import { ProjectComments, type ProjectComment } from "@/components/projecthub/pr
 import { getProfileTier } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/server";
 import { getProjectBySlug, getPublishedProjects } from "@/lib/data";
+import { getSiteUrl } from "@/lib/site-url";
 
 export async function generateMetadata({params}:{params:Promise<{slug:string}>}):Promise<Metadata>{
  const {slug}=await params;const project=await getProjectBySlug(slug);
  if(!project)return {title:"Project not found",robots:{index:false,follow:false}};
- const base=process.env.NEXT_PUBLIC_SITE_URL??"http://localhost:3000";
+ const base=getSiteUrl();
  const url=base+"/projects/"+project.slug;
  const image=project.preview_images?.[0]||project.logo_url||base+"/opengraph-image.png";
  return {title:project.name,description:project.tagline,alternates:{canonical:"/projects/"+project.slug},openGraph:{title:project.name+" — ProjectHub",description:project.tagline,url,type:"website",images:[{url:image}]},twitter:{card:"summary_large_image",title:project.name+" — ProjectHub",description:project.tagline,images:[image]}};
@@ -29,7 +30,7 @@ export async function generateMetadata({params}:{params:Promise<{slug:string}>})
 export default async function ProjectPage({params}:{params:Promise<{slug:string}>}){
  const {slug}=await params;const project=await getProjectBySlug(slug);if(!project||project.status!=="published")notFound();
  const related=await getPublishedProjects({category:project.category?.slug,limit:4});
- const publicUrl=(process.env.NEXT_PUBLIC_SITE_URL??"http://localhost:3000")+"/projects/"+project.slug;
+ const publicUrl=getSiteUrl()+"/projects/"+project.slug;
  const supabase=await createClient();
  const [{data:creatorProfile},{count:creatorProjectCount}]=project.creator_id?await Promise.all([
   supabase.from("profiles").select("display_name,username,avatar_url,verification_tier,github_connected").eq("id",project.creator_id).maybeSingle(),

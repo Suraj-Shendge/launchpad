@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { CookieConsent } from "@/components/projecthub/cookie-consent";
+import { getSiteUrl } from "@/lib/site-url";
 import { Geist } from "next/font/google";
 import "./globals.css";
 
 const geist = Geist({ subsets:["latin"], variable:"--font-geist", display:"swap" });
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const baseUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase:new URL(baseUrl),
