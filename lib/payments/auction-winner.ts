@@ -87,7 +87,10 @@ export async function createAuctionWinnerPayment(admin:AdminClient,row:SettledAu
       status:"failed",
       updated_at:new Date().toISOString()
     }).eq("id",paymentId).eq("status","pending");
-    return {ok:false,status:"order_failed" as const,error:error instanceof Error?error.message:"Razorpay order creation failed."};
+    const details=error&&typeof error==="object"&&"error" in error?error.error:null;
+    const description=details&&typeof details==="object"&&"description" in details&&typeof details.description==="string"?details.description:null;
+    const message=error instanceof Error?error.message:null;
+    return {ok:false,status:"order_failed" as const,error:description||message||"Razorpay order creation failed."};
   }
 
   const {error:paymentUpdateError}=await admin.from("payments").update({

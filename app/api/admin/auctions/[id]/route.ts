@@ -60,7 +60,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
    const payment=await createAuctionWinnerPayment(admin,{
     auction_id:id,winner_id:winningBid.bidder_id,winning_bid:winningBid.amount,winning_project_id:winningBid.project_id||null
    });
-   if(!payment.ok)paymentWarning="Auction closed and settled, but the winner payment needs recovery: "+payment.status+".";
+   if(!payment.ok)paymentWarning="Auction closed and settled, but the winner payment needs recovery. "+(payment.error||("Payment step failed: "+payment.status+"."));
   }
  }
  if(action==="settle"||action==="recover_payment"){
