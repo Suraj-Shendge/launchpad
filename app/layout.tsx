@@ -17,5 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({children}:{children:React.ReactNode}) {
-  return <html lang="en"><body className={`${geist.variable} font-sans`}>{children}<CookieConsent/></body></html>;
+  return <html lang="en"><body className={geist.variable}>{children}<CookieConsent/></body></html>;
 }
