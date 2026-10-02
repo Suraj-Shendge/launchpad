@@ -16,9 +16,10 @@ export function PromoteCheckout({projects,price}:{projects:{id:string;name:strin
   async function start(){
     if(!projectId)return;
     setBusy(true); setError("");
+    const idempotencyKey=crypto.randomUUID();
     const response=await fetch("/api/payments/order",{
       method:"POST",
-      headers:{"content-type":"application/json"},
+      headers:{"content-type":"application/json","x-idempotency-key":idempotencyKey},
       body:JSON.stringify({project_id:projectId})
     });
     const order=await response.json().catch(()=>({}));

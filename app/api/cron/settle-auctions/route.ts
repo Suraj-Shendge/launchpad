@@ -32,27 +32,42 @@ export async function GET(request:Request){
     }
     settled++;
 
-    const existing=await admin.from("payments").select("id").eq("auction_id",auction.id).maybeSingle();
-    if(existing.data)continue;
-
-    const order=await getRazorpay().orders.create({
-      amount:Math.round(Number(settledRow.winning_bid)*100),
-      currency:"INR",
-      receipt:"ph_auction_"+auction.id,
-      notes:{auction_id:auction.id,user_id:settledRow.winner_id}
-    });
-
-    const {error:paymentError}=await admin.from("payments").insert({
+    const winningProjectId=settledRow.winning_project_id||settledRow.project_id;
+    if(!winningProjectId)continue;
+    const idempotencyKey="auction:"+auction.id;
+    const {data:paymentIntent,error:paymentIntentError}=await admin.from("payments").insert({
       user_id:settledRow.winner_id,
-      project_id:settledRow.winning_project_id||settledRow.project_id||null,
+      project_id:winningProjectId,
       auction_id:auction.id,
+      idempotency_key:idempotencyKey,
       amount:Number(settledRow.winning_bid),
       currency:"INR",
       status:"pending",
-      razorpay_order_id:order.id,
-      metadata:{purpose:"auction_winner_payment"}
-    });
-    if(!paymentError)orders++;
+      metadata:{purpose:"auction_winner_payment",idempotency_key:idempotencyKey}
+    }).select("id").single();
+    if(paymentIntentError||!paymentIntent){
+      if(paymentIntentError?.code==="23505")continue;
+      continue;
+    }
+
+    let order;
+    try {
+      order=await getRazorpay().orders.create({
+        amount:Math.round(Number(settledRow.winning_bid)*100),
+        currency:"INR",
+        receipt:"ph_auction_"+auction.id,
+        notes:{auction_id:auction.id,user_id:settledRow.winner_id}
+      });
+    } catch {
+      await admin.from("payments").update({status:"failed",updated_at:new Date().toISOString()})
+        .eq("id",paymentIntent.id).eq("status","pending");
+      continue;
+    }
+
+    const {error:paymentUpdateError}=await admin.from("payments").update({
+      razorpay_order_id:order.id,updated_at:new Date().toISOString()
+    }).eq("id",paymentIntent.id).eq("status","pending");
+    if(!paymentUpdateError)orders++;
   }
   const {data:cycleResult,error:cycleSyncError}=await admin.rpc("sync_homepage_auction_cycle");
   if(cycleSyncError)return NextResponse.json({error:cycleSyncError.message,settled,orders},{status:500});
