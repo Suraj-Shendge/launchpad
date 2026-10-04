@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "discussion";
@@ -10,6 +12,8 @@ export async function POST(request: Request) {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const limiter=createAdminClient();
+  if(!await consumeRateLimit(limiter,"community-thread:"+user.id,{limit:5,windowSeconds:600,failClosed:true})) return rateLimitResponse();
 
   const { data: profile } = await supabase.from("profiles").select("is_blocked").eq("id", user.id).maybeSingle();
   if (profile?.is_blocked) return NextResponse.json({ error: "Your account cannot participate in the community." }, { status: 403 });

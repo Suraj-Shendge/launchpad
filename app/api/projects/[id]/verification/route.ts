@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { deriveOverallStatus, parseGitHubUrl, verifyGitHub, verifyWebsite } from "@/lib/project-verification";
 
 async function getOwnedProject(id:string){
@@ -25,7 +26,8 @@ export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){
 }
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   const {id}=await params; const owned=await getOwnedProject(id); if("error" in owned) return owned.error;
-  const {db,project}=owned;
+  const {db,project,user}=owned;
+  if(!await consumeRateLimit(db,"project-verification:"+user.id,{limit:5,windowSeconds:600,failClosed:true})) return rateLimitResponse();
   const body=await request.json().catch(()=>({})) as {check?:string};
   const check=body.check==="github"||body.check==="website"||body.check==="all"?body.check:"all";
   let {data:v}=await db.from("project_verifications").select("*").eq("project_id",project.id).maybeSingle();

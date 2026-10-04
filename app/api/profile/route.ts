@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
 import { serviceUnavailable } from "@/lib/api-response";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const url=z.string().trim().max(500).refine(value=>value===""||/^https?:\/\//i.test(value),"Invalid URL.");
 
@@ -22,6 +24,8 @@ export async function PATCH(request:Request){
  const supabase=await createClient();
  const {data:{user}}=await supabase.auth.getUser();
  if(!user)return NextResponse.json({error:"Authentication required."},{status:401});
+ const limiter=createAdminClient();
+ if(!await consumeRateLimit(limiter,"profile-update:"+user.id,{limit:10,windowSeconds:600})) return rateLimitResponse();
  const body=await request.json().catch(()=>({}));
  const parsed=schema.safeParse(body);
  if(!parsed.success)return NextResponse.json({error:"Invalid profile details."},{status:400});
