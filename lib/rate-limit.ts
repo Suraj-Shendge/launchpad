@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 export type RateLimitPolicy={
   limit:number;
   windowSeconds:number;
+  failClosed?:boolean;
 };
 
 export function hashRateLimitKey(value:string){
@@ -29,7 +30,7 @@ export async function consumeRateLimit(
   });
   if(error){
     console.error("Rate limiter unavailable",error);
-    return true;
+    return policy.failClosed===true ? false : true;
   }
   return data===true;
 }

@@ -16,7 +16,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
  const {data:{user}}=await supabase.auth.getUser();
  if(!user) return NextResponse.json({error:"Authentication required."},{status:401});
  const admin=createAdminClient();
- if(!await consumeRateLimit(admin,"auction-bid:"+user.id,{limit:30,windowSeconds:600})) return rateLimitResponse();
+ if(!await consumeRateLimit(admin,"auction-bid:"+user.id,{limit:30,windowSeconds:600,failClosed:true})) return rateLimitResponse();
  const parsed=schema.safeParse(await request.json().catch(()=>({})));
  if(!parsed.success)return NextResponse.json({error:"Invalid bid amount or project."},{status:400});
  const {data,error}=await supabase.rpc("place_bid",{p_auction_id:id,p_amount:parsed.data.amount,p_project_id:parsed.data.project_id});

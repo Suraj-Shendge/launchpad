@@ -29,7 +29,7 @@ export async function POST(request:Request){
   const {data:{user}}=await supabase.auth.getUser();
   if(!user) return NextResponse.json({error:"Authentication required."},{status:401});
   const limiter=createAdminClient();
-  if(!await consumeRateLimit(limiter,"project-submit:"+user.id,{limit:3,windowSeconds:3600})) return rateLimitResponse();
+  if(!await consumeRateLimit(limiter,"project-submit:"+user.id,{limit:3,windowSeconds:3600,failClosed:true})) return rateLimitResponse();
   const uploadedPaths:string[]=[];
   const cleanupUploads=async()=>{if(uploadedPaths.length) await limiter.storage.from("project-images").remove(uploadedPaths);};
   const form=await request.formData();
@@ -87,7 +87,15 @@ export async function POST(request:Request){
     const separator=item.indexOf("=");
     const key=(separator<0?item:item.slice(0,separator)).trim();
     const url=(separator<0?"":item.slice(separator+1)).trim();
-    if(key&&url) social_links[key]=url;
+    if(!key&&!url)continue;
+    if(!key||key.length>40||!/^[A-Za-z0-9._-]+$/.test(key))return NextResponse.json({error:"Social link names may only contain letters, numbers, dots, underscores and hyphens."},{status:400});
+    try{
+      const parsedUrl=new URL(url);
+      if(!["http:","https:"].includes(parsedUrl.protocol))throw new Error();
+      social_links[key]=parsedUrl.toString();
+    }catch{
+      return NextResponse.json({error:"Social links must use valid HTTP or HTTPS URLs."},{status:400});
+    }
   }
 
   const {data:project,error}=await supabase.from("projects").insert({

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const user = auth.user;
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const limiter=createAdminClient();
-  if(!await consumeRateLimit(limiter,"community-thread:"+user.id,{limit:5,windowSeconds:600})) return rateLimitResponse();
+  if(!await consumeRateLimit(limiter,"community-thread:"+user.id,{limit:5,windowSeconds:600,failClosed:true})) return rateLimitResponse();
 
   const { data: profile } = await supabase.from("profiles").select("is_blocked").eq("id", user.id).maybeSingle();
   if (profile?.is_blocked) return NextResponse.json({ error: "Your account cannot participate in the community." }, { status: 403 });

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { hasEnvVars } from "@/lib/utils";
 import { serviceUnavailable } from "@/lib/api-response";
 
@@ -10,6 +12,8 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
   if(!hasEnvVars) return serviceUnavailable();
   const {id}=await params; const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser();
   if(!user) return NextResponse.json({error:"Authentication required."},{status:401});
+  const limiter=createAdminClient();
+  if(!await consumeRateLimit(limiter,"project-update:"+user.id,{limit:20,windowSeconds:600}))return rateLimitResponse();
   const parsed=schema.safeParse(await request.json().catch(()=>({}))); if(!parsed.success) return NextResponse.json({error:"Invalid project details."},{status:400});
   const patch={...parsed.data,website_url:parsed.data.website_url||null};
   const {error}=await supabase.from("projects").update(patch).eq("id",id).eq("owner_id",user.id);
@@ -21,6 +25,8 @@ export async function DELETE(_request:Request,{params}:{params:Promise<{id:strin
   if(!hasEnvVars) return serviceUnavailable();
   const {id}=await params; const supabase=await createClient(); const {data:{user}}=await supabase.auth.getUser();
   if(!user) return NextResponse.json({error:"Authentication required."},{status:401});
+  const limiter=createAdminClient();
+  if(!await consumeRateLimit(limiter,"project-delete:"+user.id,{limit:20,windowSeconds:600}))return rateLimitResponse();
   const {error}=await supabase.from("projects").update({status:"archived"}).eq("id",id).eq("owner_id",user.id);
   if(error) return NextResponse.json({error:"Could not archive project."},{status:400}); return NextResponse.json({ok:true});
 }

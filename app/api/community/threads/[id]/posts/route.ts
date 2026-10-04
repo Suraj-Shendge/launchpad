@@ -9,7 +9,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const limiter=createAdminClient();
-  if(!await consumeRateLimit(limiter,"community-reply:"+auth.user.id,{limit:20,windowSeconds:600})) return rateLimitResponse();
+  if(!await consumeRateLimit(limiter,"community-reply:"+auth.user.id,{limit:20,windowSeconds:600,failClosed:true})) return rateLimitResponse();
 
   const { data: profile } = await supabase.from("profiles").select("is_blocked").eq("id", auth.user.id).maybeSingle();
   if (profile?.is_blocked) return NextResponse.json({ error: "Your account cannot participate in the community." }, { status: 403 });
