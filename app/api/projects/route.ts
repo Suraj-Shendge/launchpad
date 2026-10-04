@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { hasEnvVars } from "@/lib/utils";
 import { serviceUnavailable } from "@/lib/api-response";
 
@@ -26,6 +28,10 @@ export async function POST(request:Request){
   const supabase=await createClient();
   const {data:{user}}=await supabase.auth.getUser();
   if(!user) return NextResponse.json({error:"Authentication required."},{status:401});
+  const limiter=createAdminClient();
+  if(!await consumeRateLimit(limiter,"project-submit:"+user.id,{limit:3,windowSeconds:3600})) return rateLimitResponse();
+  const uploadedPaths:string[]=[];
+  const cleanupUploads=async()=>{if(uploadedPaths.length) await limiter.storage.from("project-images").remove(uploadedPaths);};
   const form=await request.formData();
   const parsed=schema.safeParse(Object.fromEntries(form.entries()));
   if(!parsed.success) return NextResponse.json({error:"Please check the required fields."},{status:400});
@@ -63,6 +69,7 @@ export async function POST(request:Request){
     const path=user.id+"/logos/"+crypto.randomUUID()+"."+extension;
     const upload=await supabase.storage.from("project-images").upload(path,await file.arrayBuffer(),{contentType:file.type,upsert:false});
     if(upload.error) return NextResponse.json({error:"Logo upload failed. Check storage configuration."},{status:500});
+    uploadedPaths.push(path);
     logo_url=supabase.storage.from("project-images").getPublicUrl(path).data.publicUrl;
   }
   const preview_images:string[]=[];
@@ -70,7 +77,8 @@ export async function POST(request:Request){
     const extension=image.type.split("/")[1].replace("jpeg","jpg");
     const path=user.id+"/previews/"+crypto.randomUUID()+"."+extension;
     const upload=await supabase.storage.from("project-images").upload(path,await image.arrayBuffer(),{contentType:image.type,upsert:false});
-    if(upload.error) return NextResponse.json({error:"A preview image could not be uploaded."},{status:500});
+    if(upload.error){await cleanupUploads();return NextResponse.json({error:"A preview image could not be uploaded."},{status:500});}
+    uploadedPaths.push(path);
     preview_images.push(supabase.storage.from("project-images").getPublicUrl(path).data.publicUrl);
   }
 
@@ -86,7 +94,7 @@ export async function POST(request:Request){
     user_id:user.id,owner_id:user.id,name:value.name,slug,tagline:value.tagline,description:value.description,
     website_url:value.website_url||null,github_url:value.github_url||null,category:category.name,category_id:value.category_id,logo_url,social_links,preview_images,status:"pending_review",
   }).select("id,slug").single();
-  if(error) return NextResponse.json({error:error.code==="23505"?"That project URL is already taken.":"Could not create project."},{status:400});
+  if(error){await cleanupUploads();return NextResponse.json({error:error.code==="23505"?"That project URL is already taken.":"Could not create project."},{status:400});}
 
   const verificationToken="phv_"+crypto.randomUUID().replace(/-/g,"");
   const verification=await supabase.from("project_verifications").insert({

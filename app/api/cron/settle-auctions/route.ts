@@ -23,6 +23,25 @@ export async function GET(request:Request){
   const {data:active,error}=await admin.from("auctions").select("id").eq("status","active").lte("ends_at",now.toISOString()).limit(50);
   if(error)return NextResponse.json({error:error.message},{status:500});
 
+  const orphanCutoff=new Date(now.getTime()-30*60*1000).toISOString();
+  const {data:orphanedPayments}=await admin.from("payments")
+    .select("id,promotion_id")
+    .eq("status","pending")
+    .eq("plan","featured")
+    .is("razorpay_order_id",null)
+    .lte("created_at",orphanCutoff)
+    .limit(50);
+  let orphaned=0;
+  for(const payment of orphanedPayments??[]){
+    const {data:failed}=await admin.from("payments").update({status:"failed",updated_at:now.toISOString()})
+      .eq("id",payment.id).eq("status","pending").is("razorpay_order_id",null).select("id").maybeSingle();
+    if(failed){
+      orphaned++;
+      if(payment.promotion_id) await admin.from("promotions").update({status:"cancelled",updated_at:now.toISOString()})
+        .eq("id",payment.promotion_id).eq("status","pending");
+    }
+  }
+
   let settled=0,extended=0,orders=0;
 
   const endingSoonUntil=new Date(now.getTime()+5*60*1000).toISOString();
@@ -205,6 +224,7 @@ export async function GET(request:Request){
     settled,
     extended,
     orders,
+    orphanedPayments:orphaned,
     homepageAuctionsCreated:Number(cycleResult??0),
     expiredPromotions:expiredPromotions?.length??0
   });

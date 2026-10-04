@@ -1,4 +1,6 @@
 import { resolve4, resolve6, resolveTxt } from "node:dns/promises";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 
 export type VerificationResult = {
@@ -13,37 +15,97 @@ const MAX_REDIRECTS=3;
 
 function isPrivateIp(ip:string){
   const v=ip.toLowerCase();
-  if(v==="localhost"||v==="::1"||v.startsWith("fc")||v.startsWith("fd")||v.startsWith("fe80:")) return true;
-  const parts=v.split(".").map(Number);
-  if(parts.length!==4||parts.some(Number.isNaN)) return false;
+  if(v==="localhost"||v==="::"||v==="::1"||v.startsWith("fc")||v.startsWith("fd")||v.startsWith("ff")) return true;
+  const firstHextet=Number.parseInt(v.split(":")[0]||"",16);
+  if(Number.isFinite(firstHextet)&&firstHextet>=0xfe80&&firstHextet<=0xfebf) return true;
+  const mapped=v.match(/^::ffff:(\\d+\\.\\d+\\.\\d+\\.\\d+)$/);
+  const ipv4=mapped?.[1]||v;
+  const parts=ipv4.split(".").map(Number);
+  if(parts.length!==4||parts.some(Number.isNaN)||parts.some(part=>part<0||part>255)) return false;
   const [x,y]=parts;
-  return x===10||x===127||(x===169&&y===254)||(x===172&&y>=16&&y<=31)||(x===192&&y===168)||x===0;
+  return x===0||x===10||x===127||(x===100&&y>=64&&y<=127)||(x===169&&y===254)||(x===172&&y>=16&&y<=31)||(x===192&&y===0)||(x===192&&y===168)||(x===198&&(y===18||y===19))||(x===198&&y===51)||(x===203&&y===0);
 }
 
-async function assertPublicHost(hostname:string){
+async function resolvePublicAddress(hostname:string){
   const normalized=hostname.replace(/^\[|\]$/g,"").toLowerCase();
   if(normalized==="localhost"||normalized.endsWith(".localhost")||normalized.endsWith(".local")) throw new Error("Private hostname is not allowed.");
-  if(isIP(normalized)===4||isIP(normalized)===6) if(isPrivateIp(normalized)) throw new Error("Private network target is not allowed.");
+  const literalType=isIP(normalized);
+  if(literalType){
+    if(isPrivateIp(normalized)) throw new Error("Private network target is not allowed.");
+    return {address:normalized,family:literalType};
+  }
   const results=await Promise.allSettled([resolve4(normalized),resolve6(normalized)]);
-  for(const result of results) if(result.status==="fulfilled") for(const ip of result.value) if(isPrivateIp(ip)) throw new Error("Private network target is not allowed.");
+  const addresses=results.flatMap(result=>result.status==="fulfilled"?result.value:[]);
+  if(!addresses.length) throw new Error("The website hostname could not be resolved.");
+  if(addresses.some(isPrivateIp)) throw new Error("Private network target is not allowed.");
+  const address=addresses.find(ip=>isIP(ip)===4)||addresses.find(ip=>isIP(ip)===6);
+  if(!address) throw new Error("The website hostname resolved to an unsupported address.");
+  return {address,family:isIP(address)};
 }
 
 export async function safeFetchText(input:string,maxBytes=250_000){
   let current=new URL(input);
   if(!["http:","https:"].includes(current.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed.");
+  if(current.username||current.password) throw new Error("Website credentials in URLs are not allowed.");
+
   for(let hop=0;hop<=MAX_REDIRECTS;hop++){
-    await assertPublicHost(current.hostname);
-    const response=await fetch(current,{redirect:"manual",headers:{"user-agent":"ProjectHub-Verifier/1.0","accept":"text/html,text/plain;q=0.9,*/*;q=0.5"},signal:AbortSignal.timeout(8000)});
-    if([301,302,303,307,308].includes(response.status)){
-      const location=response.headers.get("location"); if(!location) throw new Error("Redirect without location.");
-      current=new URL(location,current); continue;
+    const resolved=await resolvePublicAddress(current.hostname);
+    const requestHeaders={
+      "user-agent":"ProjectHub-Verifier/1.0",
+      "accept":"text/html,text/plain;q=0.9,*/*;q=0.5"
+    };
+    const requestImpl=current.protocol==="https:"?httpsRequest:httpRequest;
+    const result=await new Promise<{status:number;headers:Record<string,string|string[]|undefined>;body:string}>((resolve,reject)=>{
+      let settled=false;
+      const finish=(error?:Error,value?:{status:number;headers:Record<string,string|string[]|undefined>;body:string})=>{
+        if(settled)return;
+        settled=true;
+        error?reject(error):resolve(value!);
+      };
+      const req=requestImpl({
+        protocol:current.protocol,
+        hostname:current.hostname,
+        port:current.port||undefined,
+        method:"GET",
+        path:current.pathname+current.search,
+        headers:requestHeaders,
+        lookup:(_hostname,_options,callback)=>{
+          if((_options as {all?:boolean}).all){
+            (callback as any)(null,[{address:resolved.address,family:resolved.family}]);
+          }else{
+            callback(null,resolved.address,resolved.family);
+          }
+        },
+        ...(current.protocol==="https:"?{servername:current.hostname}:{}),
+      },response=>{
+        const chunks:Buffer[]=[];
+        let size=0;
+        const declaredLength=Number(response.headers["content-length"]||0);
+        if(Number.isFinite(declaredLength)&&declaredLength>maxBytes){response.resume();finish(new Error("Response is too large."));return;}
+        response.on("data",(chunk:Buffer|string)=>{
+          const buffer=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+          size+=buffer.length;
+          if(size>maxBytes){req.destroy();finish(new Error("Response is too large."));return;}
+          chunks.push(buffer);
+        });
+        response.on("end",()=>finish(undefined,{status:response.statusCode||0,headers:response.headers as Record<string,string|string[]|undefined>,body:Buffer.concat(chunks).toString("utf8")}));
+        response.on("error",error=>finish(error));
+      });
+      req.setTimeout(8000,()=>req.destroy(new Error("Website request timed out.")));
+      req.on("error",error=>finish(error));
+      req.end();
+    });
+
+    if([301,302,303,307,308].includes(result.status)){
+      const location=Array.isArray(result.headers.location)?result.headers.location[0]:result.headers.location;
+      if(!location) throw new Error("Redirect without location.");
+      current=new URL(location,current);
+      if(!["http:","https:"].includes(current.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed.");
+      if(current.username||current.password) throw new Error("Website credentials in URLs are not allowed.");
+      continue;
     }
-    if(!response.ok) throw new Error("HTTP "+response.status);
-    const length=Number(response.headers.get("content-length")||0);
-    if(length>maxBytes) throw new Error("Response is too large.");
-    const text=await response.text();
-    if(new TextEncoder().encode(text).byteLength>maxBytes) throw new Error("Response is too large.");
-    return {response,text,url:current.toString()};
+    if(result.status<200||result.status>=300) throw new Error("HTTP "+result.status);
+    return {text:result.body,url:current.toString()};
   }
   throw new Error("Too many redirects.");
 }

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRazorpay } from "@/lib/payments/razorpay";
 import { hasRazorpayEnv, hasSupabaseServerEnv } from "@/lib/utils";
+import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { serviceUnavailable } from "@/lib/api-response";
 
 const schema=z.object({project_id:z.string().uuid()});
@@ -18,6 +19,8 @@ export async function POST(request:Request){
   const supabase=await createClient();
   const {data:{user}}=await supabase.auth.getUser();
   if(!user)return NextResponse.json({error:"Authentication required."},{status:401});
+  const admin=createAdminClient();
+  if(!await consumeRateLimit(admin,"payment-order:"+user.id,{limit:5,windowSeconds:600})) return rateLimitResponse();
   const parsed=schema.safeParse(await request.json().catch(()=>({})));
   if(!parsed.success)return NextResponse.json({error:"Invalid project."},{status:400});
   const {data:project}=await supabase.from("projects").select("id,name").eq("id",parsed.data.project_id).eq("owner_id",user.id).eq("status","published").maybeSingle();
@@ -25,7 +28,6 @@ export async function POST(request:Request){
   const {data:setting}=await supabase.from("settings").select("value").eq("key","featured_promotion_price").single();
   const amount=Number(setting?.value??999);
   if(!Number.isFinite(amount)||amount<=0)return NextResponse.json({error:"Featured price is not configured."},{status:500});
-  const admin=createAdminClient();
   const {data:existingPayment}=await admin.from("payments")
     .select("id,razorpay_order_id,amount,currency,promotion_id,status")
     .eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
