@@ -4,6 +4,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRazorpay } from "@/lib/payments/razorpay";
+import { createDodoTestCheckout, isDodoSelected, isDodoTestSetupReady } from "@/lib/payments/dodo";
+import { getSiteUrl } from "@/lib/site-url";
 import { hasRazorpayEnv, hasSupabaseServerEnv } from "@/lib/utils";
 import { consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { serviceUnavailable } from "@/lib/api-response";
@@ -12,7 +14,9 @@ const schema=z.object({project_id:z.string().uuid()});
 
 export async function POST(request:Request){
   if(!hasSupabaseServerEnv) return serviceUnavailable("Payment backend is not configured yet.");
-  if(!hasRazorpayEnv) return serviceUnavailable("Razorpay is not configured yet.");
+  const dodoRequested=isDodoSelected();
+  if(dodoRequested&&!isDodoTestSetupReady())return serviceUnavailable("Dodo test mode requires a dodo_test_ API key, test product, webhook secret and isolated staging database. Production is blocked.");
+  if(!dodoRequested&&!hasRazorpayEnv)return serviceUnavailable("Razorpay is not configured yet.");
   const idempotencyKey=request.headers.get("x-idempotency-key")?.trim()||randomUUID();
   if(idempotencyKey.length<8||idempotencyKey.length>128)
     return NextResponse.json({error:"Invalid idempotency key."},{status:400});
@@ -29,16 +33,12 @@ export async function POST(request:Request){
   const amount=Number(setting?.value??999);
   if(!Number.isFinite(amount)||amount<=0)return NextResponse.json({error:"Featured price is not configured."},{status:500});
   const {data:existingPayment}=await admin.from("payments")
-    .select("id,razorpay_order_id,amount,currency,promotion_id,status")
+    .select("id,provider,provider_order_id,provider_payment_id,razorpay_order_id,amount,currency,promotion_id,status,metadata")
     .eq("user_id",user.id).eq("idempotency_key",idempotencyKey).maybeSingle();
   if(existingPayment){
-    if(existingPayment.razorpay_order_id) return NextResponse.json({
-      order_id:existingPayment.razorpay_order_id,
-      amount:Math.round(Number(existingPayment.amount)*100),
-      currency:existingPayment.currency,
-      key_id:process.env.RAZORPAY_KEY_ID,
-      promotion_id:existingPayment.promotion_id
-    });
+    if((existingPayment.provider||"razorpay")!==(dodoRequested?"dodo":"razorpay"))return NextResponse.json({error:"This idempotency key belongs to a different payment provider. Start a new payment attempt."},{status:409});
+    if(dodoRequested)return NextResponse.json({error:"This Dodo checkout attempt already exists. Start a new payment attempt."},{status:409});
+    if(existingPayment.razorpay_order_id)return NextResponse.json({provider:"razorpay",order_id:existingPayment.razorpay_order_id,amount:Math.round(Number(existingPayment.amount)*100),currency:existingPayment.currency,key_id:process.env.RAZORPAY_KEY_ID,promotion_id:existingPayment.promotion_id});
     return NextResponse.json({error:"This payment attempt is already being processed. Please wait a moment and retry."},{status:409});
   }
   const {data:type}=await admin.from("promotion_types").select("default_duration_days").eq("slug","featured").single();
@@ -65,22 +65,33 @@ export async function POST(request:Request){
   if(!promotion?.promotion_id)return NextResponse.json({error:"Could not create promotion."},{status:500});
   const {data:paymentIntent,error:paymentIntentError}=await admin.from("payments").insert({
     user_id:user.id,project_id:project.id,promotion_id:promotion.promotion_id,
-    plan:"featured",provider:"razorpay",idempotency_key:idempotencyKey,amount,currency:"INR",status:"pending",
+    plan:"featured",provider:dodoRequested?"dodo":"razorpay",idempotency_key:idempotencyKey,amount,currency:"INR",status:"pending",
     metadata:{purpose:"featured_promotion",idempotency_key:idempotencyKey}
   }).select("id").single();
   if(paymentIntentError||!paymentIntent){
     console.error("Featured payment intent creation failed",paymentIntentError);
     await admin.from("promotions").update({status:"cancelled"}).eq("id",promotion.promotion_id);
     const {data:racePayment}=await admin.from("payments")
-      .select("id,razorpay_order_id,amount,currency,promotion_id").eq("user_id",user.id)
+      .select("id,provider,provider_order_id,razorpay_order_id,amount,currency,promotion_id,metadata").eq("user_id",user.id)
       .eq("idempotency_key",idempotencyKey).maybeSingle();
-    if(racePayment?.razorpay_order_id) return NextResponse.json({
-      order_id:racePayment.razorpay_order_id,amount:Math.round(Number(racePayment.amount)*100),
-      currency:racePayment.currency,key_id:process.env.RAZORPAY_KEY_ID,promotion_id:racePayment.promotion_id
-    });
+    if(racePayment?.razorpay_order_id&&(racePayment.provider||"razorpay")==="razorpay")return NextResponse.json({provider:"razorpay",order_id:racePayment.razorpay_order_id,amount:Math.round(Number(racePayment.amount)*100),currency:racePayment.currency,key_id:process.env.RAZORPAY_KEY_ID,promotion_id:racePayment.promotion_id});
     return NextResponse.json({error:"Could not start payment safely. Please try again."},{status:500});
   }
 
+  if(dodoRequested){
+    try{
+      const session=await createDodoTestCheckout({productId:process.env.DODO_PAYMENTS_TEST_PRODUCT_ID!,amount,customer:{email:user.email||""},metadata:{projecthub_payment_id:paymentIntent.id,projecthub_user_id:user.id,purpose:"featured_promotion",promotion_id:promotion.promotion_id,project_id:project.id},returnUrl:getSiteUrl()+"/dashboard/promotions?payment_return=dodo"});
+      const {data:current}=await admin.from("payments").select("metadata").eq("id",paymentIntent.id).maybeSingle();
+      const oldMetadata=current?.metadata&&typeof current.metadata==="object"?current.metadata as Record<string,unknown>:{};
+      const {error:updateError}=await admin.from("payments").update({provider_order_id:session.sessionId,metadata:{...oldMetadata,dodo_checkout_session_id:session.sessionId,dodo_checkout_url:session.checkoutUrl},updated_at:new Date().toISOString()}).eq("id",paymentIntent.id);
+      if(updateError)throw new Error("Could not record Dodo checkout.");
+      return NextResponse.json({provider:"dodo",checkout_url:session.checkoutUrl,promotion_id:promotion.promotion_id});
+    }catch{
+      await admin.from("payments").update({status:"failed",updated_at:new Date().toISOString()}).eq("id",paymentIntent.id).eq("status","pending");
+      await admin.from("promotions").update({status:"cancelled",updated_at:new Date().toISOString()}).eq("id",promotion.promotion_id).eq("status","pending");
+      return NextResponse.json({error:"Could not create Dodo test checkout. Ensure the test product has Pay What You Want enabled."},{status:502});
+    }
+  }
   let order;
   try {
     order=await getRazorpay().orders.create({
@@ -99,5 +110,5 @@ export async function POST(request:Request){
   if(paymentUpdateError){
     return NextResponse.json({error:"Could not record payment order."},{status:500});
   }
-  return NextResponse.json({order_id:order.id,amount:order.amount,currency:order.currency,key_id:process.env.RAZORPAY_KEY_ID,promotion_id:promotion.promotion_id});
+  return NextResponse.json({provider:"razorpay",order_id:order.id,amount:order.amount,currency:order.currency,key_id:process.env.RAZORPAY_KEY_ID,promotion_id:promotion.promotion_id});
 }

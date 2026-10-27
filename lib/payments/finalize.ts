@@ -3,10 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export async function finalizePayment(
   admin:SupabaseClient,
   paymentId:string,
-  razorpayPaymentId?:string
+  providerPaymentId?:string
 ){
   const {data:payment}=await admin.from("payments")
-    .select("id,user_id,promotion_id,auction_id,status,amount,razorpay_payment_id,payment_deadline_at")
+    .select("id,user_id,promotion_id,auction_id,status,amount,provider,provider_payment_id,razorpay_payment_id,payment_deadline_at")
     .eq("id",paymentId).maybeSingle();
   if(!payment)return {ok:false,reason:"payment_not_found"};
   if(payment.status==="refunded")return {ok:true,reason:"payment_already_refunded"};
@@ -17,14 +17,17 @@ export async function finalizePayment(
   }
 
   if(payment.status==="paid"){
-    if(razorpayPaymentId&&!payment.razorpay_payment_id){
-      const {error}=await admin.from("payments").update({razorpay_payment_id:razorpayPaymentId,updated_at:new Date().toISOString()}).eq("id",payment.id).is("razorpay_payment_id",null);
-      if(error)return {ok:false,reason:"payment_update_failed"};
+    if(providerPaymentId&&(!payment.provider_payment_id||((payment.provider||"razorpay")==="razorpay"&&!payment.razorpay_payment_id))){
+      const update:{provider_payment_id?:string;razorpay_payment_id?:string;updated_at:string}={updated_at:new Date().toISOString()};
+      if(!payment.provider_payment_id)update.provider_payment_id=providerPaymentId;
+      if((payment.provider||"razorpay")==="razorpay"&&!payment.razorpay_payment_id)update.razorpay_payment_id=providerPaymentId;
+      const {error}=await admin.from("payments").update(update).eq("id",payment.id);if(error)return {ok:false,reason:"payment_update_failed"};
     }
   } else {
     const {error}=await admin.from("payments").update({
       status:"paid",
-      ...(razorpayPaymentId?{razorpay_payment_id:razorpayPaymentId}:{}),
+      ...(providerPaymentId?{provider_payment_id:providerPaymentId}:{}),
+      ...((payment.provider||"razorpay")==="razorpay"&&providerPaymentId?{razorpay_payment_id:providerPaymentId}:{}),
       updated_at:new Date().toISOString(),
     }).eq("id",payment.id).neq("status","refunded").neq("status","paid");
     if(error)return {ok:false,reason:"payment_update_failed"};
