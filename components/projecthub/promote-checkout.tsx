@@ -35,6 +35,7 @@ export function PromoteCheckout({projects,price,activeSlots=0,durationDays=7}:{p
         setError(order.error||"Could not create the payment order.");
         return;
       }
+      if(order.provider==="dodo"&&typeof order.checkout_url==="string"){window.location.href=order.checkout_url;return;}
       if(!window.Razorpay){
         setBusy(false);
         setError("Payment checkout is still loading. Please try again.");
@@ -99,7 +100,7 @@ export function PromoteCheckout({projects,price,activeSlots=0,durationDays=7}:{p
       <button className="button-primary checkout-submit" onClick={start} disabled={busy||!projectId||availableSlots===0}>
         {busy?"Opening checkout…":availableSlots===0?"All Featured slots are occupied":"Continue to payment"}
       </button>
-      <div className="checkout-footer"><a className="payment-policy-link" href="/refund-policy">Refund policy</a><span>Secure payment via Razorpay</span></div>
+      <div className="checkout-footer"><a className="payment-policy-link" href="/refund-policy">Refund policy</a><span>Secure checkout</span></div>
       {error&&<p className="form-error checkout-error" role="alert">{error}</p>}
     </> : <div className="empty-state"><strong>No published projects available.</strong><span>Publish a project before purchasing Featured placement.</span></div>}
   </div>;

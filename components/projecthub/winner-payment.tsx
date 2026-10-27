@@ -9,7 +9,9 @@ declare global {
   }
 }
 
-export function WinnerPayment({orderId,amount,keyId,expiresAt}:{orderId:string;amount:number;keyId:string;expiresAt?:string|null}) {
+export function WinnerPayment({orderId,amount,keyId,expiresAt,provider="razorpay",paymentId}:{
+  orderId:string;amount:number;keyId:string;expiresAt?:string|null;provider?:"razorpay"|"dodo";paymentId?:string
+}) {
   const [busy,setBusy]=useState(false);
   const [remainingMs,setRemainingMs]=useState(0);
   useEffect(()=>{
@@ -26,6 +28,16 @@ export function WinnerPayment({orderId,amount,keyId,expiresAt}:{orderId:string;a
   async function pay(){
     if(expired)return;
     setBusy(true);setError("");
+    if(provider==="dodo"){
+      if(!paymentId){setBusy(false);setError("Auction payment record missing. Refresh and retry.");return;}
+      try{
+        const response=await fetch("/api/payments/auction-checkout",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({payment_id:paymentId})});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok||typeof payload.checkout_url!=="string"){setBusy(false);setError(payload.error||"Could not create Dodo test checkout.");return;}
+        window.location.href=payload.checkout_url;
+      }catch{setBusy(false);setError("Could not connect to Dodo test checkout. Please try again.");}
+      return;
+    }
     if(!window.Razorpay){setBusy(false);setError("Payment checkout is not ready.");return}
     const checkout=new window.Razorpay({
       key:keyId,
@@ -50,9 +62,10 @@ export function WinnerPayment({orderId,amount,keyId,expiresAt}:{orderId:string;a
     checkout.open();
   }
   return <div className="winner-payment">
-    <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive"/>
+    {provider==="razorpay"&&<Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive"/>}
     <div><span>Winner payment</span><strong>₹{amount.toLocaleString("en-IN")}</strong>{expiresAt&&!expired&&<small>Payment window · {countdown}</small>}{expired&&<small>Payment window expired</small>}</div>
     {!expired&&<button className="button-primary" onClick={pay} disabled={busy}>{busy?"Opening…":"Complete payment"}</button>}
+    <small>{provider==="dodo"?"Test checkout via Dodo Payments":"Secure checkout via Razorpay"}</small>
     <a className="payment-policy-link" href="/refund-policy">Refund policy</a>
     {error&&<p className="form-error">{error}</p>}
   </div>;

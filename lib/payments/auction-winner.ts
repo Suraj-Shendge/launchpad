@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRazorpay } from "@/lib/payments/razorpay";
+import { isDodoSelected, isDodoTestSetupReady } from "@/lib/payments/dodo";
 
 type AdminClient=ReturnType<typeof createAdminClient>;
 
@@ -11,17 +12,21 @@ type SettledAuction={
 };
 
 export async function createAuctionWinnerPayment(admin:AdminClient,row:SettledAuction){
+  const dodoRequested=isDodoSelected();
+  if(dodoRequested&&!isDodoTestSetupReady())return {ok:false,status:"dodo_test_setup_missing" as const,error:"Dodo test mode requires an isolated staging database and complete test credentials."};
   if(!row.winner_id||!row.winning_bid||!row.winning_project_id){
     return {ok:true,status:"no_winner" as const};
   }
 
   const idempotencyKey="auction:"+row.auction_id;
   const {data:existing}=await admin.from("payments")
-    .select("id,status,razorpay_order_id")
+    .select("id,status,provider,razorpay_order_id")
     .eq("idempotency_key",idempotencyKey)
     .maybeSingle();
 
-  if(existing?.status==="paid"||existing?.status==="pending"){
+  if(existing?.status==="paid")return {ok:true,status:"already_exists" as const,paymentId:existing.id};
+  if(existing?.status==="pending"){
+    if((existing.provider||"razorpay")!==(dodoRequested?"dodo":"razorpay"))return {ok:false,status:"provider_mismatch" as const,error:"A pending payment already exists with a different provider."};
     return {ok:true,status:"already_exists" as const,paymentId:existing.id};
   }
 
@@ -36,6 +41,8 @@ export async function createAuctionWinnerPayment(admin:AdminClient,row:SettledAu
       amount:Number(row.winning_bid),
       currency:"INR",
       plan:"homepage",
+      provider:dodoRequested?"dodo":"razorpay",
+      provider_order_id:null,
       status:"pending",
       payment_deadline_at:deadline,
       auction_payment_round:1,
@@ -57,6 +64,7 @@ export async function createAuctionWinnerPayment(admin:AdminClient,row:SettledAu
       amount:Number(row.winning_bid),
       currency:"INR",
       plan:"homepage",
+      provider:dodoRequested?"dodo":"razorpay",
       status:"pending",
       payment_deadline_at:deadline,
       auction_payment_round:1,
@@ -74,6 +82,15 @@ export async function createAuctionWinnerPayment(admin:AdminClient,row:SettledAu
     paymentId=paymentIntent.id;
   }
 
+  if(dodoRequested){
+    // Hosted Dodo checkouts can outlive this 15-minute auction window; test-only.
+    const {data:project}=await admin.from("projects").select("slug").eq("id",row.winning_project_id).maybeSingle();
+    if(project?.slug){
+      const {data:notice}=await admin.from("notifications").select("id").eq("user_id",row.winner_id).eq("type","auction_payment_due").eq("reference_type","auction").eq("reference_id",row.auction_id).maybeSingle();
+      if(!notice)await admin.from("notifications").insert({user_id:row.winner_id,type:"auction_payment_due",title:"You won an auction",message:"Complete your homepage placement payment within 15 minutes to keep the placement.",link:"/projects/"+project.slug,reference_type:"auction",reference_id:row.auction_id});
+    }
+    return {ok:true,status:"created" as const,paymentId};
+  }
   let order;
   try {
     order=await getRazorpay().orders.create({
