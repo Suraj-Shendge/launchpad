@@ -27,8 +27,10 @@ export async function POST(request:Request){
  if(!payment&&providerPaymentId){const {data:row}=await admin.from("payments").select("id,status,provider,amount,currency,provider_payment_id,promotion_id,auction_id").eq("provider_payment_id",providerPaymentId).eq("provider","dodo").maybeSingle();payment=row as Payment|null;}
  if(!payment||!event.type||!["payment.succeeded","payment.failed","payment.cancelled","refund.succeeded"].includes(event.type)){if(eventRecord&&payment)await admin.from("payment_events").update({payment_id:payment.id}).eq("id",eventRecord.id);return NextResponse.json({ok:true});}
  if(event.type==="payment.succeeded"){
-  const amount=Number(data.total_amount),currency=String(data.currency||"").toUpperCase();
-  if(!Number.isFinite(amount)||amount!==Math.round(Number(payment.amount)*100)||currency!==String(payment.currency||"").toUpperCase()){console.error("Dodo webhook amount/currency mismatch",{paymentId:payment.id,eventId:id});return NextResponse.json({error:"Dodo amount or currency does not match payment intent."},{status:400});}
+  const amount=Number(data.total_amount),tax=Number(data.tax??0),baseAmount=amount-tax,currency=String(data.currency||"").toUpperCase();
+  // Dodo's total_amount includes tax. Compare the pre-tax amount to ProjectHub's
+  // configured placement price, while still checking the full transaction is valid.
+  if(!Number.isFinite(amount)||!Number.isFinite(tax)||tax<0||baseAmount!==Math.round(Number(payment.amount)*100)||currency!==String(payment.currency||"").toUpperCase()){console.error("Dodo webhook amount/currency mismatch",{paymentId:payment.id,eventId:id});return NextResponse.json({error:"Dodo amount or currency does not match payment intent."},{status:400});}
   const result=await finalizePayment(admin,payment.id,providerPaymentId||undefined);
   if(!result.ok)return NextResponse.json({error:"Verified Dodo payment could not be finalized.",reason:result.reason||"finalization_failed"},{status:409});
   if(eventRecord)await admin.from("payment_events").update({payment_id:payment.id}).eq("id",eventRecord.id);return NextResponse.json({ok:true});
